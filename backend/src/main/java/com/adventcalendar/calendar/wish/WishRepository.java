@@ -1,43 +1,15 @@
 package com.adventcalendar.calendar.wish;
 
 import java.time.LocalDate;
-import java.util.Comparator;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicLong;
-import org.springframework.stereotype.Repository;
+import org.springframework.data.jpa.repository.JpaRepository;
 
-@Repository
-public class WishRepository {
+public interface WishRepository extends JpaRepository<Wish, Long> {
 
-    private final Map<Long, Wish> wishes = new ConcurrentHashMap<>();
-    private final AtomicLong nextId = new AtomicLong(1);
+    List<Wish> findAllByOwnerIdOrderByDateAsc(Long ownerId);
 
-    public List<Wish> findAll() {
-        return wishes.values().stream()
-                .sorted(Comparator.comparing(Wish::date))
-                .toList();
-    }
+    Optional<Wish> findByIdAndOwnerId(Long id, Long ownerId);
 
-    public Optional<Wish> findById(Long id) {
-        return Optional.ofNullable(wishes.get(id));
-    }
-
-    public Optional<Wish> findByDate(LocalDate date) {
-        return wishes.values().stream()
-                .filter(wish -> wish.date().equals(date))
-                .findFirst();
-    }
-
-    public Wish save(Wish wish) {
-        Wish toSave = wish.id() == null ? wish.withId(nextId.getAndIncrement()) : wish;
-        wishes.put(toSave.id(), toSave);
-        return toSave;
-    }
-
-    public boolean deleteById(Long id) {
-        return wishes.remove(id) != null;
-    }
+    Optional<Wish> findByOwnerIdAndDate(Long ownerId, LocalDate date);
 }

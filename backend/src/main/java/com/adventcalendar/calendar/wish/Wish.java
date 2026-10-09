@@ -1,18 +1,96 @@
 package com.adventcalendar.calendar.wish;
 
+import com.adventcalendar.calendar.user.User;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.PreUpdate;
+import jakarta.persistence.Table;
 import java.time.Instant;
 import java.time.LocalDate;
 
-public record Wish(
-        Long id,
-        LocalDate date,
-        String title,
-        String comment,
-        Instant createdAt,
-        Instant updatedAt
-) {
+@Entity
+@Table(name = "wishes")
+public class Wish {
 
-    public Wish withId(Long newId) {
-        return new Wish(newId, date, title, comment, createdAt, updatedAt);
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "owner_id", nullable = false)
+    private User owner;
+
+    @Column(name = "wish_date", nullable = false)
+    private LocalDate date;
+
+    @Column(nullable = false, length = 100)
+    private String title;
+
+    @Column(length = 1000)
+    private String comment;
+
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private Instant createdAt;
+
+    @Column(name = "updated_at", nullable = false)
+    private Instant updatedAt;
+
+    protected Wish() {
+    }
+
+    public Wish(User owner, LocalDate date) {
+        this.owner = owner;
+        this.date = date;
+    }
+
+    public void update(String title, String comment) {
+        this.title = title;
+        this.comment = comment;
+    }
+
+    @PrePersist
+    void onCreate() {
+        createdAt = Instant.now();
+        updatedAt = createdAt;
+    }
+
+    @PreUpdate
+    void onUpdate() {
+        updatedAt = Instant.now();
+    }
+
+    public Long getId() {
+        return id;
+    }
+
+    public User getOwner() {
+        return owner;
+    }
+
+    public LocalDate getDate() {
+        return date;
+    }
+
+    public String getTitle() {
+        return title;
+    }
+
+    public String getComment() {
+        return comment;
+    }
+
+    public Instant getCreatedAt() {
+        return createdAt;
+    }
+
+    public Instant getUpdatedAt() {
+        return updatedAt;
     }
 }

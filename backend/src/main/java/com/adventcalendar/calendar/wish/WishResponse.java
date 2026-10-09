@@ -10,6 +10,6 @@ public record WishResponse(
 ) {
 
     public static WishResponse from(Wish wish) {
-        return new WishResponse(wish.id(), wish.date(), wish.title(), wish.comment());
+        return new WishResponse(wish.getId(), wish.getDate(), wish.getTitle(), wish.getComment());
     }
 }
