@@ -9,9 +9,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class WishService {
 
-    // Входа пока нет (он будет на этапе 6), поэтому «я» — это Анна с id = 1
-    private static final Long CURRENT_USER_ID = 1L;
-
     private final WishRepository wishRepository;
     private final UserRepository userRepository;
 
@@ -21,30 +18,30 @@ public class WishService {
     }
 
     @Transactional(readOnly = true)
-    public List<WishResponse> findAll() {
-        return wishRepository.findAllByOwnerIdOrderByDateAsc(CURRENT_USER_ID).stream()
+    public List<WishResponse> findAll(Long ownerId) {
+        return wishRepository.findAllByOwnerIdOrderByDateAsc(ownerId).stream()
                 .map(WishResponse::from)
                 .toList();
     }
 
     @Transactional(readOnly = true)
-    public WishResponse findById(Long id) {
-        return wishRepository.findByIdAndOwnerId(id, CURRENT_USER_ID)
+    public WishResponse findById(Long ownerId, Long id) {
+        return wishRepository.findByIdAndOwnerId(id, ownerId)
                 .map(WishResponse::from)
                 .orElseThrow(() -> new WishNotFoundException(id));
     }
 
     @Transactional
-    public WishResponse saveForDate(LocalDate date, WishRequest request) {
-        Wish wish = wishRepository.findByOwnerIdAndDate(CURRENT_USER_ID, date)
-                .orElseGet(() -> new Wish(userRepository.getReferenceById(CURRENT_USER_ID), date));
+    public WishResponse saveForDate(Long ownerId, LocalDate date, WishRequest request) {
+        Wish wish = wishRepository.findByOwnerIdAndDate(ownerId, date)
+                .orElseGet(() -> new Wish(userRepository.getReferenceById(ownerId), date));
         wish.update(request.title(), request.comment());
         return WishResponse.from(wishRepository.save(wish));
     }
 
     @Transactional
-    public void delete(Long id) {
-        Wish wish = wishRepository.findByIdAndOwnerId(id, CURRENT_USER_ID)
+    public void delete(Long ownerId, Long id) {
+        Wish wish = wishRepository.findByIdAndOwnerId(id, ownerId)
                 .orElseThrow(() -> new WishNotFoundException(id));
         wishRepository.delete(wish);
     }

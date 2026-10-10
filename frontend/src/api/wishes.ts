@@ -1,4 +1,5 @@
 // Всё общение с сервером про желания — в одном файле.
+import { request } from './http';
 
 // Так желание приходит с сервера (это WishResponse из Java)
 export type WishDto = {
@@ -13,25 +14,6 @@ export type WishInput = {
     title: string;
     comment: string;
 };
-
-// Общая функция: отправить запрос, проверить ответ, достать JSON.
-async function request<T>(url: string, init?: RequestInit): Promise<T> {
-    const response = await fetch(url, {
-        ...init,
-        headers: { 'Content-Type': 'application/json' },
-    });
-
-    if (!response.ok) {
-        // Наш GlobalExceptionHandler отвечает в формате ProblemDetail: { detail, errors? }
-        const problem = await response.json().catch(() => null);
-        const fieldError = problem?.errors && Object.values(problem.errors)[0];
-        throw new Error(fieldError ?? problem?.detail ?? `Ошибка сервера: ${response.status}`);
-    }
-
-    // 204 No Content — тела нет (так отвечает удаление)
-    if (response.status === 204) return undefined as T;
-    return response.json();
-}
 
 export function fetchMyWishes() {
     return request<WishDto[]>('/api/wishes');

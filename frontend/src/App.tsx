@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { UserId, Wish } from './types';
-import { USERS } from './data/fakeData';
+import { USERS, fakeIdFor } from './data/fakeData';
+import { useLogout, useMe } from './api/useAuth';
 import { useFakeStore } from './data/useFakeStore';
 import { formatDate } from './lib/dates';
 import { Header } from './components/Header';
@@ -13,8 +14,11 @@ import { useDeleteWish, useMyWishes, useSaveWish } from './api/useMyWishes';
 import { toWishesByDate } from './api/toWishesByDate';
 
 export default function App() {
-  const [me, setMe] = useState<UserId>('anna');        // кто «я» (пока через «Смотреть как»)
-  const [owner, setOwner] = useState<UserId>('anna');  // чей календарь открыт
+  // Кто «я» — теперь знает сервер. RequireAuth не пустит сюда без входа, поэтому data точно есть.
+  const user = useMe().data!;
+  const me = fakeIdFor(user);
+  const [owner, setOwner] = useState<UserId>(me);  // чей календарь открыт
+  const logoutMutation = useLogout();
   const [month, setMonth] = useState(() => {
     const now = new Date();
     return { year: now.getFullYear(), month: now.getMonth() };
@@ -24,16 +28,15 @@ export default function App() {
   const store = useFakeStore(me);
   const toast = useToast();
 
-  // Настоящие данные с сервера. Вход появится на этапе 6, а пока сервер считает,
-  // что «я» — это Анна (id = 1). Поэтому с сервера берём только календарь Анны.
+// Настоящие данные с сервера: желания того, кто вошёл
   const myWishesQuery = useMyWishes();
   const saveMutation = useSaveWish();
   const deleteMutation = useDeleteWish();
 
-  const annaWishes = toWishesByDate(myWishesQuery.data ?? [], store.wishes.anna);
-  const wishesOf = (id: UserId) => (id === 'anna' ? annaWishes : store.wishes[id]);
+  const myWishes = toWishesByDate(myWishesQuery.data ?? [], store.wishes[me] ?? {});
+  const wishesOf = (id: UserId) => (id === me ? myWishes : store.wishes[id] ?? {});
 
-  const status = owner !== 'anna' ? undefined
+  const status = owner !== me ? undefined
       : myWishesQuery.isPending ? 'Загружаю желания…'
           : myWishesQuery.isError ? 'Не получилось загрузить желания: ' + myWishesQuery.error.message
               : undefined;
@@ -58,25 +61,18 @@ export default function App() {
     setMonth({ year: d.getFullYear(), month: d.getMonth() });
   }
 
-  function changeMe(id: UserId) {
-    // Остаёмся в том же календаре, если новый «я» — его владелец или друг владельца
-    setOwner(owner === id || store.isFriend(id, owner) ? owner : id);
-    setMe(id);
-    setOpenDay(null);
-    toast.showToast(`Вы смотрите как ${USERS[id].name}`);
+  function logout() {
+    logoutMutation.mutate(); // на /login отправит RequireAuth, когда узнает, что мы вышли
   }
+
   // Окно закрыли, подсказку показали
   function done(text: string) {
     setOpenDay(null);
     toast.showToast(text);
   }
 
-  function saveDay(date: string, wish: Wish) {
-    if (me !== 'anna') {            // Борис и Вика пока живут только в браузере
-      store.saveWish(date, wish);
-      done('Сохранено');
-      return;
-    }
+  function saveDay(date: string, wish: Wish){
+
     saveMutation.mutate({ date, input: { title: wish.title, comment: wish.comment } }, {
       onSuccess: () => {
         store.saveWish(date, wish);  // картинку и доступ пока помнит браузер
@@ -87,8 +83,8 @@ export default function App() {
   }
 
   function deleteDay(date: string) {
-    const id = annaWishes[date]?.id;
-    if (me !== 'anna' || id === undefined) {
+    const id = myWishes[date]?.id;
+    if (id === undefined) {
       store.deleteWish(date);
       done('Удалено');
       return;
@@ -114,7 +110,7 @@ export default function App() {
 
   return (
       <>
-        <Header me={me} badge={badge} onChangeMe={changeMe}
+        <Header me={me} badge={badge} onLogout={logout}
                 onFriendsClick={() => document.getElementById('side')?.scrollIntoView({ behavior: 'smooth', block: 'start' })} />
 
         <main className="wrap">

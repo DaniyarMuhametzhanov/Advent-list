@@ -38,3 +38,15 @@ export const INITIAL_WISHES: Record<UserId, WishesByDate> = {
 export const INITIAL_FRIENDS: [UserId, UserId][] = [['anna', 'boris']];
 export const INITIAL_FRIEND_REQUESTS: FriendRequest[] = [{ from: 'vika', to: 'anna' }];
 export const INITIAL_ACCESS_REQUESTS: AccessRequest[] = [{ from: 'boris', owner: 'anna', date: day(12) }];
+// Этап 6: настоящий пользователь с сервера → его «двойник» в фейковых данных
+// (друзья пока фейковые, до этапа 7). Анна, Борис и Вика — это id 1, 2, 3 в базе.
+// Нового человека добавляем на лету: у него пока нет ни друзей, ни заявок.
+const SEED_IDS: Record<number, UserId> = { 1: 'anna', 2: 'boris', 3: 'vika' };
+
+export function fakeIdFor(user: { id: number; name: string }): UserId {
+    const seeded = SEED_IDS[user.id];
+    if (seeded) return seeded;
+    const id = 'user' + user.id;
+    USERS[id] ??= { id, name: user.name, gen: user.name, color: '#6B7280' };
+    return id;
+}

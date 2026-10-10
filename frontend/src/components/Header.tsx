@@ -1,25 +1,22 @@
 import type { UserId } from '../types';
 import { USERS } from '../data/fakeData';
+import { Avatar } from './Avatar';
 
 type Props = {
     me: UserId;
     badge: number;
-    onChangeMe: (id: UserId) => void;
     onFriendsClick: () => void;
+    onLogout: () => void;
 };
 
-export function Header({ me, badge, onChangeMe, onFriendsClick }: Props) {
+export function Header({ me, badge, onFriendsClick, onLogout }: Props) {
     return (
         <header className="top">
             <div className="top-in">
                 <div className="logo"><i>🎁</i><span>Адвент-календарь</span></div>
 
-                {/* Временный переключатель для демо. На этапе 6 его заменит настоящий вход. */}
-                <label className="viewas" htmlFor="viewas">Смотреть как:
-                    <select id="viewas" value={me} onChange={e => onChangeMe(e.target.value)}>
-                        {Object.values(USERS).map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
-                    </select>
-                </label>
+                <span className="me"><Avatar user={USERS[me]} />{USERS[me].name}</span>
+                <button className="btn sm ghost" onClick={onLogout}>Выйти</button>
 
                 <button className="btn-friends" onClick={onFriendsClick}>
                     Друзья{badge > 0 && <span className="badge">{badge}</span>}

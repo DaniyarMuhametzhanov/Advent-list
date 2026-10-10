@@ -1,5 +1,7 @@
 package com.adventcalendar.calendar.error;
 
+import com.adventcalendar.calendar.auth.EmailTakenException;
+import org.springframework.security.core.AuthenticationException;
 import com.adventcalendar.calendar.wish.WishNotFoundException;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -17,6 +19,16 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(WishNotFoundException.class)
     public ProblemDetail handleNotFound(WishNotFoundException ex) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
+    }
+    @ExceptionHandler(EmailTakenException.class)
+    public ProblemDetail handleEmailTaken(EmailTakenException ex) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
+    }
+
+    @ExceptionHandler(AuthenticationException.class)
+    public ProblemDetail handleBadLogin(AuthenticationException ex) {
+        // Не говорим, что именно не так (email или пароль), чтобы нельзя было подбирать email
+        return ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, "Неверный email или пароль");
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

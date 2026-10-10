@@ -31,6 +31,11 @@ public class User {
 
     protected User() {
     }
+    public User(String name, String email, String passwordHash) {
+        this.name = name;
+        this.email = email;
+        this.passwordHash = passwordHash;
+    }
 
     @PrePersist
     void onCreate() {

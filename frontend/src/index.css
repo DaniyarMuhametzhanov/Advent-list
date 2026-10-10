@@ -166,3 +166,10 @@ textarea.field{resize:vertical;min-height:84px}
 @keyframes unwrap{from{opacity:0;transform:scale(.4) rotate(-12deg)}}
 @keyframes wiggle{20%{transform:translateX(-6px)}40%{transform:translateX(6px)}60%{transform:translateX(-4px)}80%{transform:translateX(3px)}}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+/* Страницы входа и регистрации (этап 6) */
+.auth{max-width:400px;margin:64px auto;padding:28px;display:grid;gap:18px}
+.auth h1{font-family:var(--display);font-size:24px}
+.auth form{display:grid;gap:14px}
+.auth a{color:var(--berry);font-weight:600}
+.page-msg{text-align:center;margin-top:64px}
+.me{display:flex;align-items:center;gap:8px;font-weight:600}
