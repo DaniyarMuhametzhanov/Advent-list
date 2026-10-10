@@ -17,7 +17,8 @@ export type Wish = {
     id?: number;
     title: string;
     comment: string;
-    img: WishImage;
+    img: WishImage;   // большая картинка для окна дня
+    thumb: WishImage; // маленькая картинка для клетки календаря
     access: UserId[]; // друзья, которым открыт этот день
     requested?: boolean; // чужой день: я уже попросил доступ и жду ответа
 };

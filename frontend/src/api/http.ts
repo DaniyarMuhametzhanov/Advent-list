@@ -18,7 +18,10 @@ function readCookie(name: string): string | undefined {
 
 // Отправить запрос, проверить ответ, достать JSON.
 export async function request<T>(url: string, init?: RequestInit): Promise<T> {
-    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    // Файл (FormData) отправляем без своего Content-Type: браузер сам поставит
+    // multipart/form-data и границу между частями формы. Всё остальное — JSON
+    const isForm = init?.body instanceof FormData;
+    const headers: Record<string, string> = isForm ? {} : { 'Content-Type': 'application/json' };
 
     // Защита от CSRF: сервер положил токен в cookie XSRF-TOKEN,
     // а мы возвращаем его в заголовке. Чужой сайт этот cookie прочитать не может.

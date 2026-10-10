@@ -5,6 +5,7 @@ import com.adventcalendar.calendar.access.AccessRequestNotFoundException;
 import com.adventcalendar.calendar.friend.FriendRequestException;
 import com.adventcalendar.calendar.friend.FriendRequestNotFoundException;
 import com.adventcalendar.calendar.friend.NotFriendsException;
+import com.adventcalendar.calendar.image.BadImageException;
 import com.adventcalendar.calendar.user.UserNotFoundException;
 import com.adventcalendar.calendar.auth.EmailTakenException;
 import org.springframework.security.core.AuthenticationException;
@@ -18,6 +19,8 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -68,6 +71,22 @@ public class GlobalExceptionHandler {
     public ProblemDetail handleTypeMismatch(MethodArgumentTypeMismatchException ex) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST,
                 "Неверное значение '" + ex.getValue() + "' для параметра " + ex.getName());
+    }
+
+    @ExceptionHandler(BadImageException.class)
+    public ProblemDetail handleBadImage(BadImageException ex) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
+    }
+
+    // Файл больше, чем разрешено в application.properties. До нашего кода такой файл даже не доходит
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ProblemDetail handleTooLarge(MaxUploadSizeExceededException ex) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.CONTENT_TOO_LARGE, "Картинка больше 5 МБ");
+    }
+
+    @ExceptionHandler(MissingServletRequestPartException.class)
+    public ProblemDetail handleNoFile(MissingServletRequestPartException ex) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, "Файл не выбран");
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)

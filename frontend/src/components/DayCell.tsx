@@ -42,7 +42,7 @@ export function DayCell({ date, day, wish, me, isOwn, isToday, myFriends, onOpen
         return (
             <button className={'cell has' + (isOwn ? '' : ' opened') + today} onClick={open}
                     aria-label={`${label}: ${wish.title}`}>
-                <WishThumb img={wish.img} />
+                <WishThumb img={wish.thumb} />
                 {num}
                 {seenBy.length > 0 && (
                     <span className="shared" title={'Видят: ' + seenBy.map(f => USERS[f].name).join(', ')}>

@@ -21,6 +21,8 @@ export type CalendarDayDto = {
     requested: boolean;     // я уже попросил доступ к этому дню
     title: string | null;   // у закрытого дня сервер не присылает название
     comment: string | null;
+    imageUrl: string | null; // у закрытого дня сервер не присылает и адреса картинки
+    thumbUrl: string | null;
 };
 
 export function searchUsers(q: string) {

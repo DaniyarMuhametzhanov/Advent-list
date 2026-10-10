@@ -11,5 +11,19 @@ services:
     volumes:
       - postgres-data:/var/lib/postgresql/data
 
+  minio:
+    image: pgsty/minio:RELEASE.2026-08-04T00-00-00Z
+    container_name: advent-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: advent
+      MINIO_ROOT_PASSWORD: advent-secret
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio-data:/data
+
 volumes:
   postgres-data:
+  minio-data:

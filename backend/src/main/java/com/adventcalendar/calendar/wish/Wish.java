@@ -42,6 +42,10 @@ public class Wish {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
+    // Имя картинки в хранилище MinIO. null = картинки нет
+    @Column(name = "image_key", length = 100)
+    private String imageKey;
+
     protected Wish() {
     }
 
@@ -92,5 +96,13 @@ public class Wish {
 
     public Instant getUpdatedAt() {
         return updatedAt;
+    }
+
+    public String getImageKey() {
+        return imageKey;
+    }
+
+    public void setImageKey(String imageKey) {
+        this.imageKey = imageKey;
     }
 }

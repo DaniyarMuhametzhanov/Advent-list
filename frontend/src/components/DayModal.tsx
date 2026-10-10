@@ -16,7 +16,7 @@ type Props = {
     alreadyAsked: boolean;                      // я уже просил доступ к этому дню?
     origin: { x: number; y: number } | null;    // откуда лететь конфетти (центр клетки)
     onClose: () => void;
-    onSave: (date: string, wish: Wish) => void;
+    onSave: (date: string, wish: Wish, file: File | null) => void; // file — новая картинка, если выбрали
     onDelete: (date: string) => void;
     onSetAccess: (date: string, friend: UserId, open: boolean) => void;
     onRequestAccess: (date: string) => void;
@@ -73,11 +73,17 @@ export function DayModal(props: Props) {
     );
 }
 
+// Те же правила, что на сервере: проверяем заранее, чтобы не гонять большой файл зря
+const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif'];
+const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5 МБ
+const NO_IMAGE: WishImage = { emoji: '🎁', bg: '#FBE4EC' };
+
 /* ---------- Свой день: форма ---------- */
 function OwnDay({ date, wish, myFriends, onSave, onDelete, onSetAccess, onToast }: Props) {
     const [title, setTitle] = useState(wish?.title ?? '');
     const [comment, setComment] = useState(wish?.comment ?? '');
-    const [draftImg, setDraftImg] = useState<WishImage | null>(null);
+    const [draftImg, setDraftImg] = useState<WishImage | null>(null);   // предпросмотр выбранной картинки
+    const [draftFile, setDraftFile] = useState<File | null>(null);      // сам файл: уйдёт на сервер при «Сохранить»
     const [draftAccess, setDraftAccess] = useState<UserId[]>([]); // доступ для ещё не сохранённого желания
     const [showError, setShowError] = useState(false);
     const [confirmDelete, setConfirmDelete] = useState(false);
@@ -88,10 +94,12 @@ function OwnDay({ date, wish, myFriends, onSave, onDelete, onSetAccess, onToast 
     const access = wish ? wish.access : draftAccess;
 
     function readFile(file: File | undefined) {
-        if (!file || !file.type.startsWith('image/')) { onToast('Нужен файл с картинкой'); return; }
-        const reader = new FileReader();
-        reader.onload = () => setDraftImg({ src: reader.result as string });
-        reader.readAsDataURL(file); // картинка превращается в длинную строку data:image/...
+        if (!file) return;
+        if (!IMAGE_TYPES.includes(file.type)) { onToast('Подойдут картинки JPG, PNG или GIF'); return; }
+        if (file.size > MAX_IMAGE_SIZE) { onToast('Картинка больше 5 МБ'); return; }
+        setDraftFile(file);
+        // Временный адрес файла внутри браузера: чтобы показать картинку до отправки на сервер
+        setDraftImg({ src: URL.createObjectURL(file) });
     }
 
     function onDrop(e: DragEvent) {
@@ -110,9 +118,10 @@ function OwnDay({ date, wish, myFriends, onSave, onDelete, onSetAccess, onToast 
         onSave(date, {
             title: title.trim(),
             comment: comment.trim(),
-            img: img ?? { emoji: '🎁', bg: '#FBE4EC' },
+            img: img ?? NO_IMAGE,
+            thumb: img ?? NO_IMAGE,
             access,
-        });
+        }, draftFile);
     }
 
     return (
@@ -126,8 +135,8 @@ function OwnDay({ date, wish, myFriends, onSave, onDelete, onSetAccess, onToast 
                 </div>
                 <div className="upload" style={{ marginTop: 10 }}>
                     <button className="btn sm ghost" onClick={() => fileRef.current?.click()}>Загрузить</button>
-                    <span className="hint">или перетащите файл в рамку</span>
-                    <input ref={fileRef} type="file" accept="image/*" hidden onChange={e => readFile(e.target.files?.[0])} />
+                    <span className="hint">или перетащите файл в рамку. JPG, PNG или GIF, до 5 МБ</span>
+                    <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/gif" hidden onChange={e => readFile(e.target.files?.[0])} />
                 </div>
             </div>
 

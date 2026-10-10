@@ -4,7 +4,6 @@ import type { FriendRequestDto } from './api/friends';
 import type { AccessRequestDto } from './api/access';
 import { USERS, fakeIdFor } from './data/fakeData';
 import { useLogout, useMe } from './api/useAuth';
-import { useFakeStore } from './data/useFakeStore';
 import { dateKey, formatDate } from './lib/dates';
 import { Header } from './components/Header';
 import { Calendar } from './components/Calendar';
@@ -34,7 +33,6 @@ export default function App() {
   });
   const [openDay, setOpenDay] = useState<{ date: string; origin: { x: number; y: number } } | null>(null);
 
-  const store = useFakeStore(me);
   const toast = useToast();
 
   // Друзья и заявки в друзья — с сервера
@@ -66,7 +64,7 @@ export default function App() {
   const monthKey = dateKey(month.year, month.month, 1).slice(0, 7); // '2026-10'
   const friendCalendarQuery = useFriendCalendar(owner === me ? null : USERS[owner].serverId, monthKey);
 
-  const myWishes = toWishesByDate(myWishesQuery.data ?? [], store.wishes[me] ?? {});
+  const myWishes = toWishesByDate(myWishesQuery.data ?? []);
   const ownerWishes = owner === me ? myWishes : toFriendWishes(friendCalendarQuery.data ?? [], me);
 
   const loading = owner === me ? myWishesQuery : friendCalendarQuery;
@@ -102,11 +100,10 @@ export default function App() {
     toast.showToast(text);
   }
 
-  function saveDay(date: string, wish: Wish) {
+  function saveDay(date: string, wish: Wish, file: File | null) {
     const isNew = myWishes[date] === undefined;
-    saveMutation.mutate({ date, input: { title: wish.title, comment: wish.comment } }, {
+    saveMutation.mutate({ date, input: { title: wish.title, comment: wish.comment }, file }, {
       onSuccess: async saved => {
-        store.saveWish(date, wish);  // картинку пока помнит браузер
         // У нового желания доступ включаем только сейчас: до сохранения у него не было id
         if (isNew) {
           try {
@@ -158,16 +155,9 @@ export default function App() {
 
   function deleteDay(date: string) {
     const id = myWishes[date]?.id;
-    if (id === undefined) {
-      store.deleteWish(date);
-      done('Удалено');
-      return;
-    }
+    if (id === undefined) return;
     deleteMutation.mutate(id, {
-      onSuccess: () => {
-        store.deleteWish(date);
-        done('Удалено');
-      },
+      onSuccess: () => done('Удалено'),
       onError: error => toast.showToast(error.message),
     });
   }

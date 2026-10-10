@@ -5,6 +5,7 @@ import com.adventcalendar.calendar.access.WishAccess;
 import com.adventcalendar.calendar.access.WishAccessRepository;
 import com.adventcalendar.calendar.friend.FriendService;
 import com.adventcalendar.calendar.friend.NotFriendsException;
+import com.adventcalendar.calendar.image.ImageStorage;
 import com.adventcalendar.calendar.user.UserRepository;
 import java.time.LocalDate;
 import java.time.YearMonth;
@@ -24,14 +25,17 @@ public class WishService {
     private final FriendService friendService;
     private final WishAccessRepository accessRepository;
     private final AccessRequestRepository requestRepository;
+    private final ImageStorage imageStorage;
 
     public WishService(WishRepository wishRepository, UserRepository userRepository, FriendService friendService,
-                       WishAccessRepository accessRepository, AccessRequestRepository requestRepository) {
+                       WishAccessRepository accessRepository, AccessRequestRepository requestRepository,
+                       ImageStorage imageStorage) {
         this.wishRepository = wishRepository;
         this.userRepository = userRepository;
         this.friendService = friendService;
         this.accessRepository = accessRepository;
         this.requestRepository = requestRepository;
+        this.imageStorage = imageStorage;
     }
 
     @Transactional(readOnly = true)
@@ -62,12 +66,16 @@ public class WishService {
         return withAccess(wishRepository.save(wish));
     }
 
-    // Доступы и запросы доступа к желанию удалит сама база: ON DELETE CASCADE в V4__access.sql
+    // Доступы и запросы доступа к желанию удалит сама база: ON DELETE CASCADE в V4__access.sql.
+    // А файлы картинки в MinIO база не видит — их удаляем сами
     @Transactional
     public void delete(Long ownerId, Long id) {
         Wish wish = wishRepository.findByIdAndOwnerId(id, ownerId)
                 .orElseThrow(() -> new WishNotFoundException(id));
         wishRepository.delete(wish);
+        if (wish.getImageKey() != null) {
+            imageStorage.delete(wish.getImageKey());
+        }
     }
 
     @Transactional(readOnly = true)
