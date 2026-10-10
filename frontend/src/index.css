@@ -60,7 +60,7 @@ button.cell.empty:hover{background:var(--surface);border-color:var(--berry)}
 .plus{position:absolute;inset:0;display:grid;place-items:center;font-size:22px;color:var(--berry);opacity:0;transition:opacity .15s}
 button.cell.empty:hover .plus,button.cell.empty:focus-visible .plus{opacity:1}
 .ph{position:absolute;inset:0;display:grid;place-items:center;font-size:clamp(20px,4.2vw,40px)}
-.cell img,.preview img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.cell img,.preview img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain}
 .cap{position:absolute;left:0;right:0;bottom:0;z-index:2;background:rgba(255,255,255,.92);padding:3px 8px;font-size:12px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .shared{position:absolute;top:6px;right:6px;z-index:2;background:var(--mint);color:#fff;border-radius:999px;font-size:11px;font-weight:600;padding:2px 7px}
 .cell.has:hover{border-color:var(--ink)}
