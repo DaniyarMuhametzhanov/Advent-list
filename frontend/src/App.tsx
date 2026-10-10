@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import type { UserId, Wish } from './types';
+import type { FriendRequestDto } from './api/friends';
 import { USERS, fakeIdFor } from './data/fakeData';
 import { useLogout, useMe } from './api/useAuth';
 import { useFakeStore } from './data/useFakeStore';
-import { formatDate } from './lib/dates';
+import { dateKey, formatDate } from './lib/dates';
 import { Header } from './components/Header';
 import { Calendar } from './components/Calendar';
 import { FriendsPanel } from './components/FriendsPanel';
@@ -11,13 +12,17 @@ import { DayModal } from './components/DayModal';
 import { Toast } from './components/Toast';
 import { useToast } from './hooks/useToast';
 import { useDeleteWish, useMyWishes, useSaveWish } from './api/useMyWishes';
-import { toWishesByDate } from './api/toWishesByDate';
+import {
+  useAcceptFriendRequest, useDeclineFriendRequest, useFriendCalendar, useFriends,
+  useIncomingRequests, useRemoveFriend, useSendFriendRequest,
+} from './api/useFriends';
+import { toFriendWishes, toWishesByDate } from './api/toWishesByDate';
 
 export default function App() {
   // Кто «я» — теперь знает сервер. RequireAuth не пустит сюда без входа, поэтому data точно есть.
   const user = useMe().data!;
   const me = fakeIdFor(user);
-  const [owner, setOwner] = useState<UserId>(me);  // чей календарь открыт
+  const [selected, setSelected] = useState<UserId>(me);  // чей календарь выбрали
   const logoutMutation = useLogout();
   const [month, setMonth] = useState(() => {
     const now = new Date();
@@ -28,22 +33,36 @@ export default function App() {
   const store = useFakeStore(me);
   const toast = useToast();
 
-// Настоящие данные с сервера: желания того, кто вошёл
+  // Друзья и заявки в друзья — с сервера
+  const friendsQuery = useFriends();
+  const incomingQuery = useIncomingRequests();
+  const sendRequestMutation = useSendFriendRequest();
+  const acceptMutation = useAcceptFriendRequest();
+  const declineMutation = useDeclineFriendRequest();
+  const removeFriendMutation = useRemoveFriend();
+
+  const myFriends = (friendsQuery.data ?? []).map(fakeIdFor);
+  const incoming = incomingQuery.data ?? [];
+
+  // Чей календарь открыт. Если человека удалили из друзей, показываем свой.
+  const owner = selected === me || myFriends.includes(selected) ? selected : me;
+
+  // Настоящие данные с сервера: мои желания и календарь друга за месяц
   const myWishesQuery = useMyWishes();
   const saveMutation = useSaveWish();
   const deleteMutation = useDeleteWish();
+  const monthKey = dateKey(month.year, month.month, 1).slice(0, 7); // '2026-10'
+  const friendCalendarQuery = useFriendCalendar(owner === me ? null : USERS[owner].serverId, monthKey);
 
   const myWishes = toWishesByDate(myWishesQuery.data ?? [], store.wishes[me] ?? {});
-  const wishesOf = (id: UserId) => (id === me ? myWishes : store.wishes[id] ?? {});
+  const ownerWishes = owner === me ? myWishes : toFriendWishes(friendCalendarQuery.data ?? [], me);
 
-  const status = owner !== me ? undefined
-      : myWishesQuery.isPending ? 'Загружаю желания…'
-          : myWishesQuery.isError ? 'Не получилось загрузить желания: ' + myWishesQuery.error.message
-              : undefined;
+  const loading = owner === me ? myWishesQuery : friendCalendarQuery;
+  const status = loading.isPending ? 'Загружаю желания…'
+      : loading.error ? 'Не получилось загрузить желания: ' + loading.error.message
+          : undefined;
 
-  const myFriends = store.friendsOf(me);
-  const badge = store.friendRequests.filter(r => r.to === me).length
-      + store.accessRequests.filter(r => r.owner === me).length;
+  const badge = incoming.length + store.accessRequests.filter(r => r.owner === me).length;
 
   // Файл, брошенный мимо рамки, не должен открываться вместо страницы
   useEffect(() => {
@@ -71,8 +90,7 @@ export default function App() {
     toast.showToast(text);
   }
 
-  function saveDay(date: string, wish: Wish){
-
+  function saveDay(date: string, wish: Wish) {
     saveMutation.mutate({ date, input: { title: wish.title, comment: wish.comment } }, {
       onSuccess: () => {
         store.saveWish(date, wish);  // картинку и доступ пока помнит браузер
@@ -98,8 +116,38 @@ export default function App() {
     });
   }
 
+  function addFriend(serverId: number) {
+    sendRequestMutation.mutate(serverId, {
+      onSuccess: () => toast.showToast('Заявка отправлена'),
+      onError: error => toast.showToast(error.message),
+    });
+  }
+
+  function acceptFriend(request: FriendRequestDto) {
+    acceptMutation.mutate(request.id, {
+      onSuccess: () => toast.showToast(`${request.from.name} теперь у вас в друзьях`),
+      onError: error => toast.showToast(error.message),
+    });
+  }
+
+  function declineFriend(request: FriendRequestDto) {
+    declineMutation.mutate(request.id, {
+      onSuccess: () => toast.showToast('Заявка отклонена'),
+      onError: error => toast.showToast(error.message),
+    });
+  }
+
+  function removeFriend(id: UserId) {
+    const friend = USERS[id];
+    if (!confirm(`Удалить ${friend.name} из друзей?`)) return;
+    removeFriendMutation.mutate(friend.serverId, {
+      onSuccess: () => toast.showToast(`${friend.name} больше не в друзьях`),
+      onError: error => toast.showToast(error.message),
+    });
+  }
+
   function openCalendar(id: UserId) {
-    setOwner(id);
+    setSelected(id);
     document.getElementById('cal')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
@@ -116,17 +164,18 @@ export default function App() {
         <main className="wrap">
           <Calendar
               me={me} owner={owner} year={month.year} month={month.month}
-              wishes={wishesOf(owner)} myFriends={myFriends} status={status}
+              wishes={ownerWishes} myFriends={myFriends} status={status}
               onPrev={() => changeMonth(-1)} onNext={() => changeMonth(1)}
-              onSelectOwner={setOwner} onOpenDay={openDayAt}
+              onSelectOwner={setSelected} onOpenDay={openDayAt}
           />
           <FriendsPanel
-              me={me} owner={owner} myFriends={myFriends} myWishes={wishesOf(me)}
-              friendRequests={store.friendRequests} accessRequests={store.accessRequests}
+              me={me} owner={owner} myFriends={myFriends} myWishes={myWishes}
+              incoming={incoming} accessRequests={store.accessRequests}
               onOpenCalendar={openCalendar}
-              onAddFriend={id => { store.sendFriendRequest(id); toast.showToast('Заявка отправлена'); }}
-              onAccept={id => { store.acceptFriend(id); toast.showToast(`${USERS[id].name} теперь у вас в друзьях`); }}
-              onDecline={id => { store.declineFriend(id); toast.showToast('Заявка отклонена'); }}
+              onAddFriend={addFriend}
+              onAccept={acceptFriend}
+              onDecline={declineFriend}
+              onRemoveFriend={removeFriend}
               onGrant={(id, date) => { store.setAccess(date, id, true); toast.showToast(`${USERS[id].name} теперь видит ${formatDate(date)}`); }}
               onDeny={(id, date) => { store.denyAccess(id, date); toast.showToast('В доступе отказано'); }}
           />
@@ -137,7 +186,7 @@ export default function App() {
             <DayModal
                 key={owner + openDay.date}
                 date={openDay.date} me={me} owner={owner}
-                wish={wishesOf(owner)[openDay.date]}
+                wish={ownerWishes[openDay.date]}
                 myFriends={myFriends}
                 alreadyAsked={store.accessRequests.some(r => r.from === me && r.owner === owner && r.date === openDay.date)}
                 origin={openDay.origin}

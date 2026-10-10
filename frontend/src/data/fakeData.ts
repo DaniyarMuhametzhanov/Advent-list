@@ -1,12 +1,12 @@
 // Фейковые данные: те же люди и желания, что в макете.
 // На этапе 5 их заменят настоящие данные с сервера.
-import type { AccessRequest, FriendRequest, User, UserId, Wish, WishesByDate } from '../types';
+import type { AccessRequest, User, UserId, Wish, WishesByDate } from '../types';
 import { dateKey } from '../lib/dates';
 
 export const USERS: Record<UserId, User> = {
-    anna:  { id: 'anna',  name: 'Анна',  gen: 'Анны',   color: '#C7356E' },
-    boris: { id: 'boris', name: 'Борис', gen: 'Бориса', color: '#2C6FD1' },
-    vika:  { id: 'vika',  name: 'Вика',  gen: 'Вики',   color: '#1F8F74' },
+    anna:  { id: 'anna',  serverId: 1, name: 'Анна',  gen: 'Анны',   color: '#C7356E' },
+    boris: { id: 'boris', serverId: 2, name: 'Борис', gen: 'Бориса', color: '#2C6FD1' },
+    vika:  { id: 'vika',  serverId: 3, name: 'Вика',  gen: 'Вики',   color: '#1F8F74' },
 };
 
 // Дата в текущем месяце: day(8) → '2026-10-08'
@@ -35,18 +35,15 @@ export const INITIAL_WISHES: Record<UserId, WishesByDate> = {
     },
 };
 
-export const INITIAL_FRIENDS: [UserId, UserId][] = [['anna', 'boris']];
-export const INITIAL_FRIEND_REQUESTS: FriendRequest[] = [{ from: 'vika', to: 'anna' }];
 export const INITIAL_ACCESS_REQUESTS: AccessRequest[] = [{ from: 'boris', owner: 'anna', date: day(12) }];
-// Этап 6: настоящий пользователь с сервера → его «двойник» в фейковых данных
-// (друзья пока фейковые, до этапа 7). Анна, Борис и Вика — это id 1, 2, 3 в базе.
-// Нового человека добавляем на лету: у него пока нет ни друзей, ни заявок.
-const SEED_IDS: Record<number, UserId> = { 1: 'anna', 2: 'boris', 3: 'vika' };
 
+// Человек с сервера → его UserId в наших компонентах.
+// Анна, Борис и Вика уже есть в USERS (там у них цвет и родительный падеж).
+// Нового человека добавляем на лету.
 export function fakeIdFor(user: { id: number; name: string }): UserId {
-    const seeded = SEED_IDS[user.id];
-    if (seeded) return seeded;
+    const known = Object.values(USERS).find(u => u.serverId === user.id);
+    if (known) return known.id;
     const id = 'user' + user.id;
-    USERS[id] ??= { id, name: user.name, gen: user.name, color: '#6B7280' };
+    USERS[id] = { id, serverId: user.id, name: user.name, gen: user.name, color: '#6B7280' };
     return id;
 }

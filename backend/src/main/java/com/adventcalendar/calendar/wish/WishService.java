@@ -5,16 +5,21 @@ import java.time.LocalDate;
 import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.adventcalendar.calendar.friend.FriendService;
+import com.adventcalendar.calendar.friend.NotFriendsException;
+import java.time.YearMonth;
 
 @Service
 public class WishService {
 
     private final WishRepository wishRepository;
     private final UserRepository userRepository;
+    private final FriendService friendService;
 
-    public WishService(WishRepository wishRepository, UserRepository userRepository) {
+    public WishService(WishRepository wishRepository, UserRepository userRepository, FriendService friendService) {
         this.wishRepository = wishRepository;
         this.userRepository = userRepository;
+        this.friendService = friendService;
     }
 
     @Transactional(readOnly = true)
@@ -44,5 +49,19 @@ public class WishService {
         Wish wish = wishRepository.findByIdAndOwnerId(id, ownerId)
                 .orElseThrow(() -> new WishNotFoundException(id));
         wishRepository.delete(wish);
+    }
+
+    @Transactional(readOnly = true)
+    public List<CalendarDayResponse> calendar(Long viewerId, Long ownerId, YearMonth month) {
+        boolean isOwner = viewerId.equals(ownerId);
+        // Чужой календарь можно смотреть только другу. Проверяем здесь, на сервере
+        if (!isOwner && !friendService.areFriends(viewerId, ownerId)) {
+            throw new NotFriendsException();
+        }
+        return wishRepository.findAllByOwnerIdAndDateBetweenOrderByDateAsc(
+                        ownerId, month.atDay(1), month.atEndOfMonth()).stream()
+                // Пока (до этапа 8) у друзей все дни закрыты: видно только, что день занят
+                .map(wish -> isOwner ? CalendarDayResponse.open(wish) : CalendarDayResponse.closed(wish))
+                .toList();
     }
 }

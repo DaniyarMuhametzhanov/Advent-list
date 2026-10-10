@@ -1,5 +1,9 @@
 package com.adventcalendar.calendar.error;
 
+import com.adventcalendar.calendar.friend.FriendRequestException;
+import com.adventcalendar.calendar.friend.FriendRequestNotFoundException;
+import com.adventcalendar.calendar.friend.NotFriendsException;
+import com.adventcalendar.calendar.user.UserNotFoundException;
 import com.adventcalendar.calendar.auth.EmailTakenException;
 import org.springframework.security.core.AuthenticationException;
 import com.adventcalendar.calendar.wish.WishNotFoundException;
@@ -23,6 +27,21 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(EmailTakenException.class)
     public ProblemDetail handleEmailTaken(EmailTakenException ex) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
+    }
+
+    @ExceptionHandler({UserNotFoundException.class, FriendRequestNotFoundException.class})
+    public ProblemDetail handleFriendNotFound(RuntimeException ex) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
+    }
+
+    @ExceptionHandler(FriendRequestException.class)
+    public ProblemDetail handleFriendRequest(FriendRequestException ex) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
+    }
+
+    @ExceptionHandler(NotFriendsException.class)
+    public ProblemDetail handleNotFriends(NotFriendsException ex) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, ex.getMessage());
     }
 
     @ExceptionHandler(AuthenticationException.class)

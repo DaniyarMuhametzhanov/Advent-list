@@ -1,6 +1,8 @@
 import { useState } from 'react';
-import type { AccessRequest, FriendRequest, UserId, WishesByDate } from '../types';
-import { USERS } from '../data/fakeData';
+import type { AccessRequest, UserId, WishesByDate } from '../types';
+import type { FriendRequestDto, UserSearchDto } from '../api/friends';
+import { useUserSearch } from '../api/useFriends';
+import { USERS, fakeIdFor } from '../data/fakeData';
 import { formatDate } from '../lib/dates';
 import { Avatar } from './Avatar';
 
@@ -9,21 +11,21 @@ type Props = {
     owner: UserId;
     myFriends: UserId[];
     myWishes: WishesByDate;
-    friendRequests: FriendRequest[];
+    incoming: FriendRequestDto[];           // заявки в друзья, которые пришли мне
     accessRequests: AccessRequest[];
     onOpenCalendar: (id: UserId) => void;
-    onAddFriend: (id: UserId) => void;
-    onAccept: (id: UserId) => void;
-    onDecline: (id: UserId) => void;
+    onAddFriend: (serverId: number) => void;
+    onAccept: (request: FriendRequestDto) => void;
+    onDecline: (request: FriendRequestDto) => void;
+    onRemoveFriend: (id: UserId) => void;
     onGrant: (from: UserId, date: string) => void;
     onDeny: (from: UserId, date: string) => void;
 };
 
 export function FriendsPanel(props: Props) {
-    const { me, owner, myFriends, myWishes, friendRequests, accessRequests } = props;
+    const { me, owner, myFriends, myWishes, incoming, accessRequests } = props;
     const [query, setQuery] = useState('');
 
-    const incomingFriends = friendRequests.filter(r => r.to === me);
     const incomingAccess = accessRequests.filter(r => r.owner === me);
 
     return (
@@ -35,22 +37,22 @@ export function FriendsPanel(props: Props) {
                 <input className="field" id="search" type="search" placeholder="Имя" autoComplete="off"
                        value={query} onChange={e => setQuery(e.target.value)} />
                 <div style={{ marginTop: 10 }}>
-                    <SearchResults query={query} {...props} />
+                    <SearchResults query={query} onAddFriend={props.onAddFriend} />
                 </div>
             </div>
 
             <div>
-                <h3>Заявки в друзья<Count n={incomingFriends.length} /></h3>
-                {incomingFriends.length === 0 && <p className="hint">Новых заявок нет.</p>}
-                {incomingFriends.map(r => (
-                    <div className="note" key={r.from}>
+                <h3>Заявки в друзья<Count n={incoming.length} /></h3>
+                {incoming.length === 0 && <p className="hint">Новых заявок нет.</p>}
+                {incoming.map(r => (
+                    <div className="note" key={r.id}>
                         <div className="row">
-                            <Avatar user={USERS[r.from]} large />
-                            <span className="grow">{USERS[r.from].name} хочет добавить вас в друзья</span>
+                            <Avatar user={USERS[fakeIdFor(r.from)]} large />
+                            <span className="grow">{r.from.name} хочет добавить вас в друзья</span>
                         </div>
                         <div className="acts">
-                            <button className="btn sm" onClick={() => props.onAccept(r.from)}>Принять</button>
-                            <button className="btn sm ghost" onClick={() => props.onDecline(r.from)}>Отклонить</button>
+                            <button className="btn sm" onClick={() => props.onAccept(r)}>Принять</button>
+                            <button className="btn sm ghost" onClick={() => props.onDecline(r)}>Отклонить</button>
                         </div>
                     </div>
                 ))}
@@ -83,11 +85,16 @@ export function FriendsPanel(props: Props) {
                 {myFriends.length === 0 && <p className="hint">Пока никого. Найдите человека по имени и отправьте заявку.</p>}
                 <div className="list">
                     {myFriends.map(id => (
-                        <button key={id} className="friend row" aria-current={owner === id}
-                                onClick={() => props.onOpenCalendar(id)}>
-                            <Avatar user={USERS[id]} large />
-                            <span className="grow">{USERS[id].name}<small>Открыть календарь</small></span>
-                        </button>
+                        <div className="row" key={id}>
+                            <button className="friend row" aria-current={owner === id}
+                                    onClick={() => props.onOpenCalendar(id)}>
+                                <Avatar user={USERS[id]} large />
+                                <span className="grow">{USERS[id].name}<small>Открыть календарь</small></span>
+                            </button>
+                            <button className="btn sm ghost" title="Удалить из друзей"
+                                    aria-label={`Удалить ${USERS[id].name} из друзей`}
+                                    onClick={() => props.onRemoveFriend(id)}>✕</button>
+                        </div>
                     ))}
                 </div>
             </div>
@@ -111,29 +118,37 @@ function Count({ n }: { n: number }) {
     return n > 0 ? <span className="badge">{n}</span> : null;
 }
 
-function SearchResults({ query, me, myFriends, friendRequests, onAddFriend, onAccept }: Props & { query: string }) {
-    const q = query.trim().toLowerCase();
-    if (!q) return <p className="hint">Начните вводить имя, например «Вика».</p>;
+// Результаты поиска приходят с сервера, уже со статусом «кем мне приходится человек»
+function SearchResults({ query, onAddFriend }: { query: string; onAddFriend: (serverId: number) => void }) {
+    const search = useUserSearch(query);
 
-    const found = Object.values(USERS).filter(u => u.id !== me && u.name.toLowerCase().includes(q));
-    if (found.length === 0) return <p className="hint">Никого не нашли. В демо есть Анна, Борис и Вика.</p>;
+    if (!query.trim()) return <p className="hint">Начните вводить имя, например «Вика».</p>;
+    if (search.isPending) return <p className="hint">Ищу…</p>;
+    if (search.isError) return <p className="hint">Не получилось найти: {search.error.message}</p>;
+    if (search.data.length === 0) return <p className="hint">Никого не нашли.</p>;
 
     return (
         <ul className="list">
-            {found.map(u => {
-                let action;
-                if (myFriends.includes(u.id)) action = <span className="hint">Уже в друзьях</span>;
-                else if (friendRequests.some(r => r.from === me && r.to === u.id)) action = <span className="hint">Заявка отправлена</span>;
-                else if (friendRequests.some(r => r.from === u.id && r.to === me)) action = <button className="btn sm" onClick={() => onAccept(u.id)}>Принять</button>;
-                else action = <button className="btn sm" onClick={() => onAddFriend(u.id)}>Добавить в друзья</button>;
-                return (
-                    <li className="row" key={u.id}>
-                        <Avatar user={u} large />
-                        <span className="grow">{u.name}</span>
-                        {action}
-                    </li>
-                );
-            })}
+            {search.data.map(u => (
+                <li className="row" key={u.id}>
+                    <Avatar user={USERS[fakeIdFor(u)]} large />
+                    <span className="grow">{u.name}</span>
+                    <RelationAction user={u} onAddFriend={onAddFriend} />
+                </li>
+            ))}
         </ul>
     );
+}
+
+function RelationAction({ user, onAddFriend }: { user: UserSearchDto; onAddFriend: (serverId: number) => void }) {
+    switch (user.relation) {
+        case 'FRIEND':
+            return <span className="hint">Уже в друзьях</span>;
+        case 'REQUEST_SENT':
+            return <span className="hint">Заявка отправлена</span>;
+        case 'REQUEST_RECEIVED':
+            return <span className="hint">Ждёт вашего ответа</span>;
+        default:
+            return <button className="btn sm" onClick={() => onAddFriend(user.id)}>Добавить в друзья</button>;
+    }
 }

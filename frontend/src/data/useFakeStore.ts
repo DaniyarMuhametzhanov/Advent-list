@@ -1,32 +1,22 @@
-// «Пульт» с данными: всё состояние приложения и действия над ним.
-// Пока всё живёт в памяти браузера. На этапе 5 эти функции начнут ходить на сервер.
+// «Пульт» с данными, которых ещё нет на сервере: картинки, доступы к дням и запросы доступа.
+// Друзья и заявки в друзья теперь живут на сервере (этап 7), поэтому их здесь больше нет.
 import { useState } from 'react';
 import type { UserId, Wish } from '../types';
-import {
-    INITIAL_ACCESS_REQUESTS, INITIAL_FRIEND_REQUESTS, INITIAL_FRIENDS, INITIAL_WISHES, USERS,
-} from './fakeData';
+import { INITIAL_ACCESS_REQUESTS, INITIAL_WISHES } from './fakeData';
 
 export function useFakeStore(me: UserId) {
     const [wishes, setWishes] = useState(INITIAL_WISHES);
-    const [friends, setFriends] = useState(INITIAL_FRIENDS);
-    const [friendRequests, setFriendRequests] = useState(INITIAL_FRIEND_REQUESTS);
     const [accessRequests, setAccessRequests] = useState(INITIAL_ACCESS_REQUESTS);
-
-    const isFriend = (a: UserId, b: UserId) =>
-        a !== b && friends.some(pair => pair.includes(a) && pair.includes(b));
-
-    const friendsOf = (user: UserId) =>
-        Object.keys(USERS).filter(id => isFriend(user, id));
 
     // Поменять одно моё желание. change получает старое желание и возвращает новое (или undefined = удалить).
     function updateMyWish(date: string, change: (old: Wish | undefined) => Wish | undefined) {
-                setWishes(all => {
-                    const mine = { ...all[me] };
-                    const next = change(mine[date]);
-                    if (next) mine[date] = next;
-                    else delete mine[date];
-                    return { ...all, [me]: mine };
-                });
+        setWishes(all => {
+            const mine = { ...all[me] };
+            const next = change(mine[date]);
+            if (next) mine[date] = next;
+            else delete mine[date];
+            return { ...all, [me]: mine };
+        });
     }
 
     function saveWish(date: string, data: Wish) {
@@ -61,23 +51,8 @@ export function useFakeStore(me: UserId) {
         setAccessRequests(list => [...list, { from: me, owner, date }]);
     }
 
-    function sendFriendRequest(to: UserId) {
-        setFriendRequests(list => [...list, { from: me, to }]);
-    }
-
-    function acceptFriend(from: UserId) {
-        setFriendRequests(list => list.filter(r => !(r.from === from && r.to === me)));
-        setFriends(list => [...list, [me, from]]);
-    }
-
-    function declineFriend(from: UserId) {
-        setFriendRequests(list => list.filter(r => !(r.from === from && r.to === me)));
-    }
-
     return {
-        wishes, friendRequests, accessRequests,
-        isFriend, friendsOf,
+        wishes, accessRequests,
         saveWish, deleteWish, setAccess, denyAccess, requestAccess,
-        sendFriendRequest, acceptFriend, declineFriend,
     };
 }
