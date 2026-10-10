@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { UserId, Wish } from './types';
 import type { FriendRequestDto } from './api/friends';
+import type { AccessRequestDto } from './api/access';
 import { USERS, fakeIdFor } from './data/fakeData';
 import { useLogout, useMe } from './api/useAuth';
 import { useFakeStore } from './data/useFakeStore';
@@ -17,6 +18,9 @@ import {
   useIncomingRequests, useRemoveFriend, useSendFriendRequest,
 } from './api/useFriends';
 import { toFriendWishes, toWishesByDate } from './api/toWishesByDate';
+import {
+  useDenyAccessRequest, useGrantAccessRequest, useIncomingAccessRequests, useRequestAccess, useSetAccess,
+} from './api/useAccess';
 
 export default function App() {
   // Кто «я» — теперь знает сервер. RequireAuth не пустит сюда без входа, поэтому data точно есть.
@@ -44,6 +48,14 @@ export default function App() {
   const myFriends = (friendsQuery.data ?? []).map(fakeIdFor);
   const incoming = incomingQuery.data ?? [];
 
+  // Доступ к дням — тоже с сервера
+  const accessRequestsQuery = useIncomingAccessRequests();
+  const setAccessMutation = useSetAccess();
+  const requestAccessMutation = useRequestAccess();
+  const grantRequestMutation = useGrantAccessRequest();
+  const denyRequestMutation = useDenyAccessRequest();
+  const accessRequests = accessRequestsQuery.data ?? [];
+
   // Чей календарь открыт. Если человека удалили из друзей, показываем свой.
   const owner = selected === me || myFriends.includes(selected) ? selected : me;
 
@@ -62,7 +74,7 @@ export default function App() {
       : loading.error ? 'Не получилось загрузить желания: ' + loading.error.message
           : undefined;
 
-  const badge = incoming.length + store.accessRequests.filter(r => r.owner === me).length;
+  const badge = incoming.length + accessRequests.length;
 
   // Файл, брошенный мимо рамки, не должен открываться вместо страницы
   useEffect(() => {
@@ -91,11 +103,55 @@ export default function App() {
   }
 
   function saveDay(date: string, wish: Wish) {
+    const isNew = myWishes[date] === undefined;
     saveMutation.mutate({ date, input: { title: wish.title, comment: wish.comment } }, {
-      onSuccess: () => {
-        store.saveWish(date, wish);  // картинку и доступ пока помнит браузер
+      onSuccess: async saved => {
+        store.saveWish(date, wish);  // картинку пока помнит браузер
+        // У нового желания доступ включаем только сейчас: до сохранения у него не было id
+        if (isNew) {
+          try {
+            await Promise.all(wish.access.map(friend =>
+                setAccessMutation.mutateAsync({ wishId: saved.id, friendId: USERS[friend].serverId, open: true })));
+          } catch (error) {
+            toast.showToast((error as Error).message); // желание сохранилось, а доступ — нет
+            return;
+          }
+        }
         done('Сохранено');
       },
+      onError: error => toast.showToast(error.message),
+    });
+  }
+
+  // Переключатель «кто видит этот день» у уже сохранённого желания: меняем сразу на сервере
+  function changeAccess(date: string, friend: UserId, open: boolean) {
+    const wishId = myWishes[date]?.id;
+    if (wishId === undefined) return;
+    setAccessMutation.mutate({ wishId, friendId: USERS[friend].serverId, open }, {
+      onSuccess: () => toast.showToast(`${USERS[friend].name} ${open ? 'теперь видит' : 'больше не видит'} этот день`),
+      onError: error => toast.showToast(error.message),
+    });
+  }
+
+  function askAccess(date: string) {
+    const wishId = ownerWishes[date]?.id;
+    if (wishId === undefined) return;
+    requestAccessMutation.mutate(wishId, {
+      onSuccess: () => toast.showToast('Запрос отправлен'),
+      onError: error => toast.showToast(error.message),
+    });
+  }
+
+  function grantRequest(request: AccessRequestDto) {
+    grantRequestMutation.mutate(request.id, {
+      onSuccess: () => toast.showToast(`${request.from.name} теперь видит ${formatDate(request.date)}`),
+      onError: error => toast.showToast(error.message),
+    });
+  }
+
+  function denyRequest(request: AccessRequestDto) {
+    denyRequestMutation.mutate(request.id, {
+      onSuccess: () => toast.showToast('В доступе отказано'),
       onError: error => toast.showToast(error.message),
     });
   }
@@ -169,15 +225,15 @@ export default function App() {
               onSelectOwner={setSelected} onOpenDay={openDayAt}
           />
           <FriendsPanel
-              me={me} owner={owner} myFriends={myFriends} myWishes={myWishes}
-              incoming={incoming} accessRequests={store.accessRequests}
+              me={me} owner={owner} myFriends={myFriends}
+              incoming={incoming} accessRequests={accessRequests}
               onOpenCalendar={openCalendar}
               onAddFriend={addFriend}
               onAccept={acceptFriend}
               onDecline={declineFriend}
               onRemoveFriend={removeFriend}
-              onGrant={(id, date) => { store.setAccess(date, id, true); toast.showToast(`${USERS[id].name} теперь видит ${formatDate(date)}`); }}
-              onDeny={(id, date) => { store.denyAccess(id, date); toast.showToast('В доступе отказано'); }}
+              onGrant={grantRequest}
+              onDeny={denyRequest}
           />
         </main>
 
@@ -188,16 +244,13 @@ export default function App() {
                 date={openDay.date} me={me} owner={owner}
                 wish={ownerWishes[openDay.date]}
                 myFriends={myFriends}
-                alreadyAsked={store.accessRequests.some(r => r.from === me && r.owner === owner && r.date === openDay.date)}
+                alreadyAsked={ownerWishes[openDay.date]?.requested ?? false}
                 origin={openDay.origin}
                 onClose={() => setOpenDay(null)}
                 onSave={saveDay}
                 onDelete={deleteDay}
-                onSetAccess={(date, friend, open) => {
-                  store.setAccess(date, friend, open);
-                  toast.showToast(`${USERS[friend].name} ${open ? 'теперь видит' : 'больше не видит'} этот день`);
-                }}
-                onRequestAccess={date => { store.requestAccess(owner, date); toast.showToast('Запрос отправлен'); }}
+                onSetAccess={changeAccess}
+                onRequestAccess={askAccess}
                 onToast={toast.showToast}
             />
         )}

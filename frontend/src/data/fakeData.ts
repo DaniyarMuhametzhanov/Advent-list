@@ -1,6 +1,6 @@
 // Фейковые данные: те же люди и желания, что в макете.
 // На этапе 5 их заменят настоящие данные с сервера.
-import type { AccessRequest, User, UserId, Wish, WishesByDate } from '../types';
+import type { User, UserId, Wish, WishesByDate } from '../types';
 import { dateKey } from '../lib/dates';
 
 export const USERS: Record<UserId, User> = {
@@ -35,8 +35,6 @@ export const INITIAL_WISHES: Record<UserId, WishesByDate> = {
     },
 };
 
-export const INITIAL_ACCESS_REQUESTS: AccessRequest[] = [{ from: 'boris', owner: 'anna', date: day(12) }];
-
 // Человек с сервера → его UserId в наших компонентах.
 // Анна, Борис и Вика уже есть в USERS (там у них цвет и родительный падеж).
 // Нового человека добавляем на лету.
@@ -46,4 +44,9 @@ export function fakeIdFor(user: { id: number; name: string }): UserId {
     const id = 'user' + user.id;
     USERS[id] = { id, serverId: user.id, name: user.name, gen: user.name, color: '#6B7280' };
     return id;
+}
+
+// Обратный перевод: id из базы → UserId в компонентах. Нужен для списка «кому открыт день»
+export function idForServerId(serverId: number): UserId {
+    return Object.values(USERS).find(u => u.serverId === serverId)?.id ?? 'user' + serverId;
 }

@@ -1,5 +1,7 @@
 package com.adventcalendar.calendar.friend;
 
+import com.adventcalendar.calendar.access.AccessRequestRepository;
+import com.adventcalendar.calendar.access.WishAccessRepository;
 import com.adventcalendar.calendar.user.User;
 import com.adventcalendar.calendar.user.UserNotFoundException;
 import com.adventcalendar.calendar.user.UserRepository;
@@ -15,13 +17,19 @@ public class FriendService {
     private final FriendshipRepository friendshipRepository;
     private final FriendRequestRepository requestRepository;
     private final UserRepository userRepository;
+    private final WishAccessRepository accessRepository;
+    private final AccessRequestRepository accessRequestRepository;
 
     public FriendService(FriendshipRepository friendshipRepository,
                          FriendRequestRepository requestRepository,
-                         UserRepository userRepository) {
+                         UserRepository userRepository,
+                         WishAccessRepository accessRepository,
+                         AccessRequestRepository accessRequestRepository) {
         this.friendshipRepository = friendshipRepository;
         this.requestRepository = requestRepository;
         this.userRepository = userRepository;
+        this.accessRepository = accessRepository;
+        this.accessRequestRepository = accessRequestRepository;
     }
 
     @Transactional(readOnly = true)
@@ -39,7 +47,11 @@ public class FriendService {
     @Transactional
     public void removeFriend(Long me, Long friendId) {
         friendshipRepository.deleteByUserAIdAndUserBId(Math.min(me, friendId), Math.max(me, friendId));
-        // Этап 8: здесь же удалим доступы к дням между этими людьми
+        // Бывший друг больше не видит мои дни, а я — его. Запросы доступа в обе стороны тоже удаляем
+        accessRepository.deleteAllGivenBy(me, friendId);
+        accessRepository.deleteAllGivenBy(friendId, me);
+        accessRequestRepository.deleteAllSentTo(me, friendId);
+        accessRequestRepository.deleteAllSentTo(friendId, me);
     }
 
     @Transactional(readOnly = true)

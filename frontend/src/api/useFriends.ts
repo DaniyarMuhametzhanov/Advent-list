@@ -36,13 +36,16 @@ export function useFriendCalendar(userId: number | null, month: string) {
     });
 }
 
-// После любого действия с друзьями устаревают: список друзей, заявки и поиск (там статусы)
+// После любого действия с друзьями устаревают: список друзей, заявки и поиск (там статусы).
+// При удалении из друзей сервер стирает доступы и запросы доступа между людьми — их тоже обновляем
 function useRefreshFriends() {
     const queryClient = useQueryClient();
     return () => {
         queryClient.invalidateQueries({ queryKey: FRIENDS });
         queryClient.invalidateQueries({ queryKey: INCOMING });
         queryClient.invalidateQueries({ queryKey: SEARCH });
+        queryClient.invalidateQueries({ queryKey: ['wishes', 'mine'] });
+        queryClient.invalidateQueries({ queryKey: ['access-requests'] });
     };
 }
 

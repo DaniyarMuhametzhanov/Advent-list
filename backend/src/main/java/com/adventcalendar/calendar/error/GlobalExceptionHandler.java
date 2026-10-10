@@ -1,5 +1,7 @@
 package com.adventcalendar.calendar.error;
 
+import com.adventcalendar.calendar.access.AccessException;
+import com.adventcalendar.calendar.access.AccessRequestNotFoundException;
 import com.adventcalendar.calendar.friend.FriendRequestException;
 import com.adventcalendar.calendar.friend.FriendRequestNotFoundException;
 import com.adventcalendar.calendar.friend.NotFriendsException;
@@ -29,13 +31,14 @@ public class GlobalExceptionHandler {
         return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
     }
 
-    @ExceptionHandler({UserNotFoundException.class, FriendRequestNotFoundException.class})
+    @ExceptionHandler({UserNotFoundException.class, FriendRequestNotFoundException.class,
+            AccessRequestNotFoundException.class})
     public ProblemDetail handleFriendNotFound(RuntimeException ex) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
     }
 
-    @ExceptionHandler(FriendRequestException.class)
-    public ProblemDetail handleFriendRequest(FriendRequestException ex) {
+    @ExceptionHandler({FriendRequestException.class, AccessException.class})
+    public ProblemDetail handleConflict(RuntimeException ex) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
     }
 

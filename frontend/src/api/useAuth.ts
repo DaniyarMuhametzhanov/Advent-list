@@ -34,7 +34,10 @@ export function useLogout() {
     const queryClient = useQueryClient();
     return useMutation({
         mutationFn: logout,
-        onSuccess: () => {
+        onSuccess: async () => {
+            // 0. При выходе сервер стёр cookie XSRF-TOKEN. Спрашиваем «кто я» ещё раз:
+            //    ответ будет 401, но вместе с ним сервер пришлёт новый токен для следующего входа
+            await fetchMe();
             // 1. «Я — никто». RequireAuth это увидит и сам отправит на /login
             queryClient.setQueryData(ME, null);
             // 2. Забываем всё остальное о прошлом пользователе (его желания и т. д.)

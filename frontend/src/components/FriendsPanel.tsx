@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import type { AccessRequest, UserId, WishesByDate } from '../types';
+import type { UserId } from '../types';
 import type { FriendRequestDto, UserSearchDto } from '../api/friends';
+import type { AccessRequestDto } from '../api/access';
 import { useUserSearch } from '../api/useFriends';
 import { USERS, fakeIdFor } from '../data/fakeData';
 import { formatDate } from '../lib/dates';
@@ -10,23 +11,20 @@ type Props = {
     me: UserId;
     owner: UserId;
     myFriends: UserId[];
-    myWishes: WishesByDate;
     incoming: FriendRequestDto[];           // заявки в друзья, которые пришли мне
-    accessRequests: AccessRequest[];
+    accessRequests: AccessRequestDto[];     // запросы доступа к моим дням
     onOpenCalendar: (id: UserId) => void;
     onAddFriend: (serverId: number) => void;
     onAccept: (request: FriendRequestDto) => void;
     onDecline: (request: FriendRequestDto) => void;
     onRemoveFriend: (id: UserId) => void;
-    onGrant: (from: UserId, date: string) => void;
-    onDeny: (from: UserId, date: string) => void;
+    onGrant: (request: AccessRequestDto) => void;
+    onDeny: (request: AccessRequestDto) => void;
 };
 
 export function FriendsPanel(props: Props) {
-    const { me, owner, myFriends, myWishes, incoming, accessRequests } = props;
+    const { owner, myFriends, incoming, accessRequests } = props;
     const [query, setQuery] = useState('');
-
-    const incomingAccess = accessRequests.filter(r => r.owner === me);
 
     return (
         <aside className="card side" id="side" aria-label="Друзья">
@@ -59,21 +57,21 @@ export function FriendsPanel(props: Props) {
             </div>
 
             <div>
-                <h3>Запросы доступа к дням<Count n={incomingAccess.length} /></h3>
-                {incomingAccess.length === 0 && <p className="hint">Никто не просит доступ.</p>}
+                <h3>Запросы доступа к дням<Count n={accessRequests.length} /></h3>
+                {accessRequests.length === 0 && <p className="hint">Никто не просит доступ.</p>}
                 <div className="list">
-                    {incomingAccess.map(r => (
-                        <div className="note" key={r.from + r.date}>
+                    {accessRequests.map(r => (
+                        <div className="note" key={r.id}>
                             <div className="row">
-                                <Avatar user={USERS[r.from]} large />
+                                <Avatar user={USERS[fakeIdFor(r.from)]} large />
                                 <span className="grow">
-                  {USERS[r.from].name} просит доступ к {formatDate(r.date)}
-                                    <small>{myWishes[r.date]?.title}</small>
+                  {r.from.name} просит доступ к {formatDate(r.date)}
+                                    <small>{r.title}</small>
                 </span>
                             </div>
                             <div className="acts">
-                                <button className="btn sm" onClick={() => props.onGrant(r.from, r.date)}>Открыть</button>
-                                <button className="btn sm ghost" onClick={() => props.onDeny(r.from, r.date)}>Отказать</button>
+                                <button className="btn sm" onClick={() => props.onGrant(r)}>Открыть</button>
+                                <button className="btn sm ghost" onClick={() => props.onDeny(r)}>Отказать</button>
                             </div>
                         </div>
                     ))}

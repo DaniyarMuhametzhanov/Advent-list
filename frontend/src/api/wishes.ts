@@ -7,6 +7,7 @@ export type WishDto = {
     date: string;           // '2026-10-05'
     title: string;
     comment: string | null; // комментария может не быть
+    access: number[];       // id друзей, которым открыт этот день
 };
 
 // Так желание уходит на сервер (это WishRequest из Java)

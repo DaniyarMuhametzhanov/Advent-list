@@ -19,9 +19,8 @@ export type Wish = {
     comment: string;
     img: WishImage;
     access: UserId[]; // друзья, которым открыт этот день
+    requested?: boolean; // чужой день: я уже попросил доступ и жду ответа
 };
 
 // Желания одного человека: ключ — дата '2026-10-08', значение — желание.
 export type WishesByDate = Record<string, Wish>;
-
-export type AccessRequest = { from: UserId; owner: UserId; date: string };

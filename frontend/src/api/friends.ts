@@ -18,6 +18,7 @@ export type CalendarDayDto = {
     wishId: number;
     date: string;           // '2026-10-08'
     open: boolean;          // можно ли мне видеть, что внутри
+    requested: boolean;     // я уже попросил доступ к этому дню
     title: string | null;   // у закрытого дня сервер не присылает название
     comment: string | null;
 };

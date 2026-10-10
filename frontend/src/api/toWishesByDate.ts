@@ -2,28 +2,28 @@
 import type { UserId, WishesByDate, WishImage } from '../types';
 import type { WishDto } from './wishes';
 import type { CalendarDayDto } from './friends';
+import { idForServerId } from '../data/fakeData';
 
 const DEFAULT_IMG: WishImage = { emoji: '🎁', bg: '#FBE4EC' };
 
-// Сервер пока хранит только название и комментарий.
-// Картинку и доступ берём из памяти браузера (local), пока их нет на сервере (этапы 8 и 9).
+// Название, комментарий и доступ — с сервера.
+// Картинку пока берём из памяти браузера (local), её на сервере ещё нет (этап 9).
 export function toWishesByDate(list: WishDto[], local: WishesByDate): WishesByDate {
     const result: WishesByDate = {};
     for (const dto of list) {
-        const old = local[dto.date];
         result[dto.date] = {
             id: dto.id,
             title: dto.title,
             comment: dto.comment ?? '',
-            img: old?.img ?? DEFAULT_IMG,
-            access: old?.access ?? [],
+            img: local[dto.date]?.img ?? DEFAULT_IMG,
+            access: dto.access.map(idForServerId),
         };
     }
     return result;
 }
 
 // Календарь друга. access: [me] значит «мне этот день открыт».
-// До этапа 8 сервер присылает все дни друзей закрытыми: без названия и комментария.
+// У закрытого дня сервер не присылает название и комментарий, поэтому там пустые строки.
 export function toFriendWishes(days: CalendarDayDto[], me: UserId): WishesByDate {
     const result: WishesByDate = {};
     for (const day of days) {
@@ -33,6 +33,7 @@ export function toFriendWishes(days: CalendarDayDto[], me: UserId): WishesByDate
             comment: day.comment ?? '',
             img: DEFAULT_IMG,
             access: day.open ? [me] : [],
+            requested: day.requested,
         };
     }
     return result;
