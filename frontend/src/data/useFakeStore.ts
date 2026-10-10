@@ -20,13 +20,13 @@ export function useFakeStore(me: UserId) {
 
     // Поменять одно моё желание. change получает старое желание и возвращает новое (или undefined = удалить).
     function updateMyWish(date: string, change: (old: Wish | undefined) => Wish | undefined) {
-        setWishes(all => {
-            const mine = { ...all[me] };
-            const next = change(mine[date]);
-            if (next) mine[date] = next;
-            else delete mine[date];
-            return { ...all, [me]: mine };
-        });
+                setWishes(all => {
+                    const mine = { ...all[me] };
+                    const next = change(mine[date]);
+                    if (next) mine[date] = next;
+                    else delete mine[date];
+                    return { ...all, [me]: mine };
+                });
     }
 
     function saveWish(date: string, data: Wish) {
@@ -40,9 +40,13 @@ export function useFakeStore(me: UserId) {
     }
 
     function setAccess(date: string, friend: UserId, open: boolean) {
-        updateMyWish(date, old => old && {
-            ...old,
-            access: open ? [...old.access, friend] : old.access.filter(id => id !== friend),
+        updateMyWish(date, old => {
+            // Желание может быть только на сервере, а здесь его ещё нет — тогда начинаем с пустого
+            const base = old ?? { title: '', comment: '', img: { emoji: '🎁', bg: '#FBE4EC' }, access: [] };
+            return {
+                ...base,
+                access: open ? [...base.access, friend] : base.access.filter(id => id !== friend),
+            };
         });
         if (open) {
             setAccessRequests(list => list.filter(r => !(r.from === friend && r.owner === me && r.date === date)));

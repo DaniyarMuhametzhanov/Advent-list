@@ -13,6 +13,7 @@ export type User = {
 export type WishImage = { emoji: string; bg: string } | { src: string };
 
 export type Wish = {
+    id?: number;
     title: string;
     comment: string;
     img: WishImage;

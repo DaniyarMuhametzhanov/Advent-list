@@ -5,6 +5,7 @@ import { Avatar } from './Avatar';
 import { DayCell } from './DayCell';
 
 type Props = {
+    status?: string;
     me: UserId;
     owner: UserId;           // чей календарь открыт
     year: number;
@@ -44,9 +45,9 @@ export function Calendar(props: Props) {
             </div>
 
             <p className="sub">
-                {isOwn
+                {props.status ?? (isOwn
                     ? 'Нажмите на число, чтобы добавить или изменить желание.'
-                    : <>Вы — <b>{USERS[me].name}</b> и смотрите адвент-календарь <b>{USERS[owner].gen}</b>. Закрытые дни отмечены замком.</>}
+                    : <>Вы — <b>{USERS[me].name}</b> и смотрите адвент-календарь <b>{USERS[owner].gen}</b>. Закрытые дни отмечены замком.</>)}
             </p>
 
             <div className="grid">
