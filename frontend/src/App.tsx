@@ -17,6 +17,8 @@ import {
   useIncomingRequests, useRemoveFriend, useSendFriendRequest,
 } from './api/useFriends';
 import { toFriendWishes, toWishesByDate } from './api/toWishesByDate';
+import { useCreateHoliday, useDeleteHoliday, useMyHolidays, useRenameHoliday } from './api/useHolidays';
+import type { HolidayDto } from './api/holidays';
 import {
   useDenyAccessRequest, useGrantAccessRequest, useIncomingAccessRequests, useRequestAccess, useSetAccess,
 } from './api/useAccess';
@@ -32,6 +34,11 @@ export default function App() {
     return { year: now.getFullYear(), month: now.getMonth() };
   });
   const [openDay, setOpenDay] = useState<{ date: string; origin: { x: number; y: number } } | null>(null);
+  const [friendsOpen, setFriendsOpen] = useState(false); // выдвинута ли панель «Друзья»
+  // Друзья, чьи вкладки убрали с главной крестиком. Из друзей они при этом не удаляются.
+  // Запоминаем в браузере (localStorage), чтобы после обновления страницы вкладки не вернулись
+  const hiddenKey = 'hiddenCalendars:' + user.id;
+  const [hidden, setHidden] = useState<UserId[]>(() => readHidden(hiddenKey));
 
   const toast = useToast();
 
@@ -73,6 +80,47 @@ export default function App() {
           : undefined;
 
   const badge = incoming.length + accessRequests.length;
+
+  // Мои праздники (дни рождения и т. п.) — с сервера
+  const myHolidays = useMyHolidays().data ?? {};
+  const createHolidayMutation = useCreateHoliday();
+  const renameHolidayMutation = useRenameHoliday();
+  const deleteHolidayMutation = useDeleteHoliday();
+
+  function addHoliday(date: string, title: string) {
+    createHolidayMutation.mutate({ date, title }, {
+      onSuccess: () => toast.showToast(`Праздник «${title}» добавлен`),
+      onError: error => toast.showToast(error.message),
+    });
+  }
+
+  function renameHoliday(holiday: HolidayDto, title: string) {
+    renameHolidayMutation.mutate({ id: holiday.id, title }, {
+      onSuccess: () => toast.showToast(`Праздник переименован: «${title}»`),
+      onError: error => toast.showToast(error.message),
+    });
+  }
+
+  function deleteHoliday(holiday: HolidayDto) {
+    deleteHolidayMutation.mutate(holiday.id, {
+      onSuccess: () => toast.showToast(`Праздник «${holiday.title}» удалён`),
+      onError: error => toast.showToast(error.message),
+    });
+  }
+
+  // Вкладки на главной: все друзья, кроме убранных
+  const tabs = myFriends.filter(id => !hidden.includes(id));
+
+  function saveHidden(list: UserId[]) {
+    setHidden(list);
+    try { localStorage.setItem(hiddenKey, JSON.stringify(list)); } catch { /* браузер запретил хранение — просто не запомним */ }
+  }
+
+  // Крестик на вкладке: убрать её с главной. Если это открытый сейчас календарь — вернуться к своему
+  function hideTab(id: UserId) {
+    saveHidden([...hidden, id]);
+    if (selected === id) setSelected(me);
+  }
 
   // Файл, брошенный мимо рамки, не должен открываться вместо страницы
   useEffect(() => {
@@ -192,9 +240,17 @@ export default function App() {
     });
   }
 
+  // Выбрали друга в панели: показываем его календарь и убираем панель
+  // Вернуть вкладку друга на главную (пункт меню ⋮ в панели «Друзья»)
+  function showTab(id: UserId) {
+    saveHidden(hidden.filter(h => h !== id));
+  }
+
+  // Если вкладку друга убирали, она снова появится на главной
   function openCalendar(id: UserId) {
     setSelected(id);
-    document.getElementById('cal')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    setFriendsOpen(false);
+    if (hidden.includes(id)) showTab(id);
   }
 
   function openDayAt(date: string, cell: HTMLElement) {
@@ -204,17 +260,20 @@ export default function App() {
 
   return (
       <>
-        <Header me={me} badge={badge} onLogout={logout}
-                onFriendsClick={() => document.getElementById('side')?.scrollIntoView({ behavior: 'smooth', block: 'start' })} />
+        <Header me={me} badge={badge} friendsOpen={friendsOpen} onLogout={logout}
+                onFriendsClick={() => setFriendsOpen(true)} />
 
         <main className="wrap">
           <Calendar
               me={me} owner={owner} year={month.year} month={month.month}
-              wishes={ownerWishes} myFriends={myFriends} status={status}
+              wishes={ownerWishes} myFriends={myFriends} myHolidays={myHolidays} tabs={tabs} status={status}
               onPrev={() => changeMonth(-1)} onNext={() => changeMonth(1)}
-              onSelectOwner={setSelected} onOpenDay={openDayAt}
+              onSelectOwner={setSelected} onHideTab={hideTab} onOpenDay={openDayAt}
           />
-          <FriendsPanel
+        </main>
+
+        <FriendsPanel
+              open={friendsOpen} onClose={() => setFriendsOpen(false)}
               me={me} owner={owner} myFriends={myFriends}
               incoming={incoming} accessRequests={accessRequests}
               onOpenCalendar={openCalendar}
@@ -222,10 +281,10 @@ export default function App() {
               onAccept={acceptFriend}
               onDecline={declineFriend}
               onRemoveFriend={removeFriend}
+              hiddenTabs={hidden} onShowTab={showTab} onHideTab={hideTab}
               onGrant={grantRequest}
               onDeny={denyRequest}
-          />
-        </main>
+        />
 
         {/* key: при открытии другого дня окно создаётся заново с чистой формой */}
         {openDay && (
@@ -242,10 +301,24 @@ export default function App() {
                 onSetAccess={changeAccess}
                 onRequestAccess={askAccess}
                 onToast={toast.showToast}
+                myHolidays={owner === me ? myHolidays[openDay.date.slice(5)] : undefined}
+                onAddHoliday={addHoliday}
+                onRenameHoliday={renameHoliday}
+                onDeleteHoliday={deleteHoliday}
             />
         )}
 
         <Toast text={toast.text} visible={toast.visible} />
       </>
   );
+}
+
+// Прочитать список убранных вкладок из браузера. Нет записи или она испорчена — пустой список
+function readHidden(key: string): UserId[] {
+  try {
+    const saved = JSON.parse(localStorage.getItem(key) ?? '[]');
+    return Array.isArray(saved) ? saved : [];
+  } catch {
+    return [];
+  }
 }

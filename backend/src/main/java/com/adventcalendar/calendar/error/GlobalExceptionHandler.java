@@ -5,6 +5,8 @@ import com.adventcalendar.calendar.access.AccessRequestNotFoundException;
 import com.adventcalendar.calendar.friend.FriendRequestException;
 import com.adventcalendar.calendar.friend.FriendRequestNotFoundException;
 import com.adventcalendar.calendar.friend.NotFriendsException;
+import com.adventcalendar.calendar.holiday.BadHolidayDateException;
+import com.adventcalendar.calendar.holiday.HolidayNotFoundException;
 import com.adventcalendar.calendar.image.BadImageException;
 import com.adventcalendar.calendar.user.UserNotFoundException;
 import com.adventcalendar.calendar.auth.EmailTakenException;
@@ -35,7 +37,7 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler({UserNotFoundException.class, FriendRequestNotFoundException.class,
-            AccessRequestNotFoundException.class})
+            AccessRequestNotFoundException.class, HolidayNotFoundException.class})
     public ProblemDetail handleFriendNotFound(RuntimeException ex) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
     }
@@ -71,6 +73,11 @@ public class GlobalExceptionHandler {
     public ProblemDetail handleTypeMismatch(MethodArgumentTypeMismatchException ex) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST,
                 "Неверное значение '" + ex.getValue() + "' для параметра " + ex.getName());
+    }
+
+    @ExceptionHandler(BadHolidayDateException.class)
+    public ProblemDetail handleBadHolidayDate(BadHolidayDateException ex) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
     }
 
     @ExceptionHandler(BadImageException.class)

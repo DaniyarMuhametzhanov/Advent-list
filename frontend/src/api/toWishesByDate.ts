@@ -41,6 +41,7 @@ export function toFriendWishes(days: CalendarDayDto[], me: UserId): WishesByDate
             thumb: image(day.thumbUrl),
             access: day.open ? [me] : [],
             requested: day.requested,
+            holidays: day.holidays ?? [],
         };
     }
     return result;

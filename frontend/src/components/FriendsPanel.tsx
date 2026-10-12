@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { UserId } from '../types';
 import type { FriendRequestDto, UserSearchDto } from '../api/friends';
 import type { AccessRequestDto } from '../api/access';
@@ -6,8 +6,11 @@ import { useUserSearch } from '../api/useFriends';
 import { USERS, fakeIdFor } from '../data/fakeData';
 import { formatDate } from '../lib/dates';
 import { Avatar } from './Avatar';
+import { KebabMenu } from './KebabMenu';
 
 type Props = {
+    open: boolean;                          // панель выдвинута?
+    onClose: () => void;
     me: UserId;
     owner: UserId;
     myFriends: UserId[];
@@ -18,56 +21,69 @@ type Props = {
     onAccept: (request: FriendRequestDto) => void;
     onDecline: (request: FriendRequestDto) => void;
     onRemoveFriend: (id: UserId) => void;
+    hiddenTabs: UserId[];                   // друзья, чьи вкладки убраны с главной
+    onShowTab: (id: UserId) => void;        // вернуть вкладку на главную
+    onHideTab: (id: UserId) => void;        // убрать вкладку с главной
     onGrant: (request: AccessRequestDto) => void;
     onDeny: (request: AccessRequestDto) => void;
 };
 
 export function FriendsPanel(props: Props) {
-    const { owner, myFriends, incoming, accessRequests } = props;
+    const { open, onClose, owner, myFriends, incoming, accessRequests } = props;
     const [query, setQuery] = useState('');
+    const dialogRef = useRef<HTMLDialogElement>(null);
+
+    // open пришёл сверху (из App): показываем или прячем выезжающую панель
+    useEffect(() => {
+        const dialog = dialogRef.current;
+        if (!dialog) return;
+        if (open && !dialog.open) dialog.showModal();
+        if (!open && dialog.open) dialog.close();
+    }, [open]);
 
     return (
-        <aside className="card side" id="side" aria-label="Друзья">
-            <h2>Друзья</h2>
-
-            <div>
-                <h3><label htmlFor="search">Найти человека</label></h3>
-                <input className="field" id="search" type="search" placeholder="Имя" autoComplete="off"
-                       value={query} onChange={e => setQuery(e.target.value)} />
-                <div style={{ marginTop: 10 }}>
-                    <SearchResults query={query} onAddFriend={props.onAddFriend} />
+        <dialog ref={dialogRef} className="drawer" aria-labelledby="friendsTitle"
+                onClose={onClose}                                          // закрыли клавишей Esc
+                onClick={e => { if (e.target === e.currentTarget) onClose(); }}> {/* клик по тёмному фону */}
+            <aside className="side" id="side">
+                <div className="side-head">
+                    <h2 id="friendsTitle">Друзья</h2>
+                    <button className="x" onClick={onClose} aria-label="Закрыть">✕</button>
                 </div>
-            </div>
 
-            <div>
-                <h3>Заявки в друзья<Count n={incoming.length} /></h3>
-                {incoming.length === 0 && <p className="hint">Новых заявок нет.</p>}
-                {incoming.map(r => (
-                    <div className="note" key={r.id}>
-                        <div className="row">
-                            <Avatar user={USERS[fakeIdFor(r.from)]} large />
-                            <span className="grow">{r.from.name} хочет добавить вас в друзья</span>
-                        </div>
-                        <div className="acts">
-                            <button className="btn sm" onClick={() => props.onAccept(r)}>Принять</button>
-                            <button className="btn sm ghost" onClick={() => props.onDecline(r)}>Отклонить</button>
-                        </div>
-                    </div>
-                ))}
-            </div>
+                <Section title="Найти человека" defaultOpen>
+                    <input className="field" type="search" placeholder="Имя" autoComplete="off" aria-label="Найти человека"
+                           value={query} onChange={e => setQuery(e.target.value)} />
+                    <SearchResults query={query} onAddFriend={props.onAddFriend} />
+                </Section>
 
-            <div>
-                <h3>Запросы доступа к дням<Count n={accessRequests.length} /></h3>
-                {accessRequests.length === 0 && <p className="hint">Никто не просит доступ.</p>}
-                <div className="list">
+                {/* Раздел сам раскрывается, когда в нём появилось что-то новое */}
+                <Section title="Заявки в друзья" count={incoming.length} defaultOpen={incoming.length > 0}>
+                    {incoming.length === 0 && <p className="hint">Новых заявок нет.</p>}
+                    {incoming.map(r => (
+                        <div className="note" key={r.id}>
+                            <div className="row">
+                                <Avatar user={USERS[fakeIdFor(r.from)]} large />
+                                <span className="grow">{r.from.name} хочет добавить вас в друзья</span>
+                            </div>
+                            <div className="acts">
+                                <button className="btn sm" onClick={() => props.onAccept(r)}>Принять</button>
+                                <button className="btn sm ghost" onClick={() => props.onDecline(r)}>Отклонить</button>
+                            </div>
+                        </div>
+                    ))}
+                </Section>
+
+                <Section title="Запросы доступа к дням" count={accessRequests.length} defaultOpen={accessRequests.length > 0}>
+                    {accessRequests.length === 0 && <p className="hint">Никто не просит доступ.</p>}
                     {accessRequests.map(r => (
                         <div className="note" key={r.id}>
                             <div className="row">
                                 <Avatar user={USERS[fakeIdFor(r.from)]} large />
                                 <span className="grow">
-                  {r.from.name} просит доступ к {formatDate(r.date)}
+                                    {r.from.name} просит доступ к {formatDate(r.date)}
                                     <small>{r.title}</small>
-                </span>
+                                </span>
                             </div>
                             <div className="acts">
                                 <button className="btn sm" onClick={() => props.onGrant(r)}>Открыть</button>
@@ -75,39 +91,45 @@ export function FriendsPanel(props: Props) {
                             </div>
                         </div>
                     ))}
-                </div>
-            </div>
+                </Section>
 
-            <div>
-                <h3>Мои друзья</h3>
-                {myFriends.length === 0 && <p className="hint">Пока никого. Найдите человека по имени и отправьте заявку.</p>}
-                <div className="list">
+                <Section title={`Мои друзья (${myFriends.length})`} defaultOpen>
+                    {myFriends.length === 0 && <p className="hint">Пока никого. Найдите человека по имени и отправьте заявку.</p>}
                     {myFriends.map(id => (
                         <div className="row" key={id}>
                             <button className="friend row" aria-current={owner === id}
                                     onClick={() => props.onOpenCalendar(id)}>
                                 <Avatar user={USERS[id]} large />
                                 <span className="grow">{USERS[id].name}<small>Открыть календарь</small></span>
+                                <span className="go" aria-hidden="true">→</span>
                             </button>
-                            <button className="btn sm ghost" title="Удалить из друзей"
-                                    aria-label={`Удалить ${USERS[id].name} из друзей`}
-                                    onClick={() => props.onRemoveFriend(id)}>✕</button>
+                            <KebabMenu label={`Действия: ${USERS[id].name}`} items={[
+                                props.hiddenTabs.includes(id)
+                                    ? { label: 'Добавить на главный экран', onClick: () => props.onShowTab(id) }
+                                    : { label: 'Убрать с главного экрана', onClick: () => props.onHideTab(id) },
+                                { label: 'Удалить из друзей', onClick: () => props.onRemoveFriend(id), danger: true },
+                            ]} />
                         </div>
                     ))}
-                </div>
-            </div>
+                </Section>
+            </aside>
+        </dialog>
+    );
+}
 
-            <details className="script">
-                <summary>Сценарий показа</summary>
-                <ol>
-                    <li>Смотрим как Анна: её календарь уже заполнен.</li>
-                    <li>Анна открывает свободный день, загружает картинку, пишет комментарий и сохраняет.</li>
-                    <li>Переключаемся на Бориса: в календаре Анны этот день с замком.</li>
-                    <li>Возвращаемся к Анне и в окне дня включаем доступ для Бориса.</li>
-                    <li>Снова Борис: день открыт, видны картинка и комментарий.</li>
-                </ol>
-            </details>
-        </aside>
+// Раскрывающийся раздел панели. <details> умеет открываться и закрываться сам, без useState.
+// defaultOpen меняется с false на true, когда пришло что-то новое, — тогда раздел раскроется
+function Section({ title, count = 0, defaultOpen = false, children }:
+                     { title: string; count?: number; defaultOpen?: boolean; children: ReactNode }) {
+    return (
+        <details className="sec" open={defaultOpen || undefined}>
+            <summary>
+                <span className="grow">{title}</span>
+                <Count n={count} />
+                <span className="chev" aria-hidden="true">›</span>
+            </summary>
+            <div className="sec-body">{children}</div>
+        </details>
     );
 }
 

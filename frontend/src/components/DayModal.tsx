@@ -3,8 +3,11 @@ import type { DragEvent } from 'react';
 import type { UserId, Wish, WishImage } from '../types';
 import { USERS } from '../data/fakeData';
 import { formatDate } from '../lib/dates';
+import { officialHoliday } from '../data/holidays';
 import { burst } from '../lib/confetti';
+import type { HolidayDto } from '../api/holidays';
 import { Avatar } from './Avatar';
+import { KebabMenu } from './KebabMenu';
 import { WishThumb } from './WishThumb';
 
 type Props = {
@@ -21,6 +24,10 @@ type Props = {
     onSetAccess: (date: string, friend: UserId, open: boolean) => void;
     onRequestAccess: (date: string) => void;
     onToast: (text: string) => void;
+    myHolidays?: HolidayDto[];                                 // мои праздники в этот день (только в своём календаре)
+    onAddHoliday: (date: string, title: string) => void;
+    onRenameHoliday: (holiday: HolidayDto, title: string) => void;
+    onDeleteHoliday: (holiday: HolidayDto) => void;
 };
 
 export function DayModal(props: Props) {
@@ -62,6 +69,9 @@ export function DayModal(props: Props) {
                 <div className="dlg-head">
                     <div style={{ flex: 1, minWidth: 0 }}>
                         <h2 id="dlgTitle">{formatDate(date)}</h2>
+                        {officialHoliday(date) && <p className="hol-tag">🎉 {officialHoliday(date)}</p>}
+                        {/* В чужом открытом дне — праздники хозяина. В своём они ниже, в списке с меню ⋮ */}
+                        {!isOwn && wish?.holidays?.map((h, i) => <p className="hol-tag" key={i}>🎂 {h}</p>)}
                         <p>{subtitle}</p>
                     </div>
                     <button className="x" onClick={onClose} aria-label="Закрыть">✕</button>
@@ -79,7 +89,7 @@ const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5 МБ
 const NO_IMAGE: WishImage = { emoji: '🎁', bg: '#FBE4EC' };
 
 /* ---------- Свой день: форма ---------- */
-function OwnDay({ date, wish, myFriends, onSave, onDelete, onSetAccess, onToast }: Props) {
+function OwnDay({ date, wish, myFriends, onSave, onDelete, onSetAccess, onToast, myHolidays = [], onAddHoliday, onRenameHoliday, onDeleteHoliday }: Props) {
     const [title, setTitle] = useState(wish?.title ?? '');
     const [comment, setComment] = useState(wish?.comment ?? '');
     const [draftImg, setDraftImg] = useState<WishImage | null>(null);   // предпросмотр выбранной картинки
@@ -126,6 +136,9 @@ function OwnDay({ date, wish, myFriends, onSave, onDelete, onSetAccess, onToast 
 
     return (
         <>
+            <MyHolidays date={date} holidays={myHolidays}
+                        onAdd={onAddHoliday} onRename={onRenameHoliday} onDelete={onDeleteHoliday} />
+
             <div>
                 <div className={'preview drop' + (dragOver ? ' over' : '')}
                      onDragOver={e => { e.preventDefault(); setDragOver(true); }}
@@ -180,6 +193,76 @@ function OwnDay({ date, wish, myFriends, onSave, onDelete, onSetAccess, onToast 
                 )}
             </div>
         </>
+    );
+}
+
+/* ---------- Свои праздники: день рождения, годовщина ---------- */
+// Отдельно от желания: праздник можно поставить и в день без желания. Повторяется каждый год.
+// В одном дне их может быть несколько. У каждого — меню ⋮: добавить ещё, редактировать, удалить
+function MyHolidays({ date, holidays, onAdd, onRename, onDelete }: {
+    date: string;
+    holidays: HolidayDto[];
+    onAdd: (date: string, title: string) => void;
+    onRename: (holiday: HolidayDto, title: string) => void;
+    onDelete: (holiday: HolidayDto) => void;
+}) {
+    // Что сейчас открыто: ничего, форма «добавить ещё» или редактирование праздника с этим id
+    const [editing, setEditing] = useState<'none' | 'new' | number>('none');
+    const close = () => setEditing('none');
+
+    // Праздников ещё нет: свёрнутый блок, раскрывается по нажатию на заголовок
+    if (holidays.length === 0) {
+        return (
+            <details className="hol-field">
+                <summary>
+                    <span className="grow">🎂 Свой праздник</span>
+                    <span className="chev" aria-hidden="true">›</span>
+                </summary>
+                <HolidayForm button="Добавить праздник" onSubmit={title => onAdd(date, title)} />
+            </details>
+        );
+    }
+
+    // Праздники есть: показываем их списком
+    return (
+        <div className="hol-field hol-list">
+            {holidays.map(h => editing === h.id ? (
+                <HolidayForm key={h.id} initial={h.title} button="Переименовать" onCancel={close}
+                             onSubmit={title => { onRename(h, title); close(); }} />
+            ) : (
+                <div className="hol-row" key={h.id}>
+                    <span className="grow">🎂 {h.title}</span>
+                    <KebabMenu label={`Действия: ${h.title}`} items={[
+                        { label: 'Добавить ещё', onClick: () => setEditing('new') },
+                        { label: 'Редактировать', onClick: () => setEditing(h.id) },
+                        { label: 'Удалить', onClick: () => onDelete(h), danger: true },
+                    ]} />
+                </div>
+            ))}
+            {editing === 'new' && (
+                <HolidayForm button="Добавить" onCancel={close} onSubmit={title => { onAdd(date, title); close(); }} />
+            )}
+        </div>
+    );
+}
+
+// Поле с названием праздника и кнопками. <form> — чтобы срабатывал и Enter
+function HolidayForm({ initial = '', button, onSubmit, onCancel }:
+                         { initial?: string; button: string; onSubmit: (title: string) => void; onCancel?: () => void }) {
+    const [title, setTitle] = useState(initial);
+    const ready = title.trim() !== '' && title.trim() !== initial;
+
+    return (
+        <form className="hol-form" onSubmit={e => { e.preventDefault(); if (ready) onSubmit(title.trim()); }}>
+            <label className="lbl">Название <span className="hint">(каждый год в этот день)</span>
+                <input className="field" maxLength={40} placeholder="Например, день рождения мамы"
+                       autoFocus={!!onCancel} value={title} onChange={e => setTitle(e.target.value)} />
+            </label>
+            <div className="acts">
+                <button className="btn sm blue" disabled={!ready}>{button}</button>
+                {onCancel && <button type="button" className="btn sm ghost" onClick={onCancel}>Отмена</button>}
+            </div>
+        </form>
     );
 }
 

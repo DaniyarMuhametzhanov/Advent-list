@@ -1,3 +1,4 @@
+/// <reference types="vitest/config" />
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 
@@ -10,5 +11,11 @@ export default defineConfig({
     proxy: {
       '/api': 'http://localhost:8080',
     },
+  },
+  // Настройки Vitest (тесты компонентов)
+  test: {
+    environment: 'jsdom',                  // ненастоящий браузер внутри Node: есть document, window, кнопки
+    setupFiles: ['./src/test/setup.ts'],   // этот файл выполняется перед каждым файлом с тестами
+    include: ['src/**/*.test.{ts,tsx}'],   // тесты лежат рядом с кодом; папку e2e не трогаем
   },
 })

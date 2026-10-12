@@ -9,7 +9,13 @@ export type Me = {
 };
 
 export type LoginInput = { email: string; password: string };
-export type RegisterInput = { name: string; email: string; password: string };
+export type RegisterInput = {
+    name: string;
+    email: string;
+    password: string;
+    privacyAccepted: boolean; // согласие на обработку данных
+    termsAccepted: boolean;   // Условия использования + 18 лет
+};
 
 // Кто я? Если не вошёл, сервер ответит 401 — тогда возвращаем null («никто»)
 export async function fetchMe(): Promise<Me | null> {

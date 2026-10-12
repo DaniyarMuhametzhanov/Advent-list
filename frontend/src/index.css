@@ -26,11 +26,13 @@ h1,h2,h3,p{margin:0}
 .logo i{width:26px;height:26px;border-radius:8px;background:var(--berry);display:grid;place-items:center;font-style:normal;font-size:14px}
 .viewas{display:flex;align-items:center;gap:8px;background:var(--sun);border-radius:999px;padding:5px 6px 5px 14px;font-weight:600;box-shadow:var(--shadow-sm)}
 .viewas select{border:0;border-radius:999px;background:var(--surface);padding:6px 10px;font-weight:600}
-.btn-friends{display:none;border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:8px 14px;font-weight:500}
+.btn-friends{display:inline-flex;align-items:center;border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:8px 14px;font-weight:500;transition:background .15s,border-color .15s}
+.btn-friends:hover{border-color:var(--ink)}
+.btn-friends[aria-expanded="true"]{background:var(--ink);border-color:var(--ink);color:#fff}
 .badge{display:inline-grid;place-items:center;min-width:20px;height:20px;padding:0 6px;border-radius:999px;background:var(--berry);color:#fff;font-size:12px;font-weight:600;margin-left:6px}
 
 /* Сетка страницы */
-.wrap{max-width:1180px;margin:0 auto;padding-inline:16px;padding-block:20px 48px;display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:24px;align-items:start}
+.wrap{max-width:1180px;margin:0 auto;padding-inline:16px;padding-block:20px 48px}
 .card{background:var(--surface);border-radius:24px;box-shadow:var(--shadow-sm)}
 
 /* Календарь */
@@ -38,6 +40,13 @@ h1,h2,h3,p{margin:0}
 .whose{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:18px}
 .chip{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:7px 14px;font-weight:500;display:flex;align-items:center;gap:8px}
 .chip[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:#fff}
+/* Вкладка друга с крестиком: крестик лежит поверх правого края вкладки */
+.tab{position:relative;display:inline-flex}
+.tab .chip{padding-right:36px}
+.tab-x{position:absolute;right:6px;top:50%;transform:translateY(-50%);width:24px;height:24px;border-radius:50%;border:0;background:transparent;color:var(--muted);font-size:12px;display:grid;place-items:center;transition:background .15s,color .15s}
+.tab-x:hover{background:var(--berry-soft);color:var(--berry)}
+.tab[data-active="true"] .tab-x{color:rgba(255,255,255,.75)}
+.tab[data-active="true"] .tab-x:hover{background:rgba(255,255,255,.18);color:#fff}
 .ava{width:22px;height:22px;border-radius:50%;display:inline-grid;place-items:center;color:#fff;font-size:12px;font-weight:600;flex:none}
 .ava.lg{width:36px;height:36px;font-size:15px}
 .cal-head{display:flex;align-items:center;gap:12px;margin-bottom:6px}
@@ -59,6 +68,41 @@ button.cell.empty:hover{background:var(--surface);border-color:var(--berry)}
 .cell.has .num{background:rgba(255,255,255,.92)}
 .plus{position:absolute;inset:0;display:grid;place-items:center;font-size:22px;color:var(--berry);opacity:0;transition:opacity .15s}
 button.cell.empty:hover .plus,button.cell.empty:focus-visible .plus{opacity:1}
+/* Праздник: синяя рамка и название по центру */
+:root{--blue:#2C6FD1;--blue-soft:#E3EDFB}
+.cell.holiday{border:2px solid var(--blue)}
+.cell.holiday.empty{background:var(--blue-soft)}
+.hol{position:absolute;left:4px;right:4px;top:50%;transform:translateY(-50%);z-index:3;display:grid;gap:2px;text-align:center;font-size:12px;font-weight:600;line-height:1.2;color:var(--blue);pointer-events:none}
+.hol span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hol span+span{font-weight:500;font-size:11px;color:var(--ink)}
+.hol .more{font-size:10px;opacity:.8}
+/* На картинке: без плашки, только белый текст с тенью — картинку видно целиком */
+.cell.has .hol{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.85),0 0 6px rgba(0,0,0,.6)}
+.cell.has .hol span+span{color:#fff}
+/* Первый клик по клетке с картинкой прячет подписи праздников — видно картинку целиком */
+.hol{transition:opacity .2s}
+.cell.peek .hol{opacity:0}
+/* До первого клика картинка под праздником размыта и затемнена (brightness — яркость, 0.55 = 55%):
+   белая подпись видна даже на белой картинке. После клика картинка становится обычной */
+.cell.has.holiday:not(.locked) img,.cell.has.holiday:not(.locked) .ph{filter:blur(4px) brightness(.55);transition:filter .25s}
+.cell.has.holiday.peek img,.cell.has.holiday.peek .ph{filter:none}
+button.cell.holiday.empty:hover .hol{opacity:.25}
+.legend .l-hol{border:2px solid var(--blue);background:var(--blue-soft)}
+.hol-tag{color:var(--blue)!important;font-weight:600}
+.hol-field{border:1px solid var(--blue-soft);background:var(--blue-soft);border-radius:16px;padding:0 12px}
+.hol-field[open]{padding-bottom:12px;display:grid;gap:10px}
+.hol-field summary{list-style:none;display:flex;align-items:center;gap:8px;padding:12px 0;font-weight:600;font-size:14px;cursor:pointer}
+.hol-field summary::-webkit-details-marker{display:none}
+.hol-field summary .grow{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hol-field summary b{color:var(--blue)}
+.hol-field[open] .chev{transform:rotate(90deg)}
+/* Список своих праздников: строка «🎂 название» и меню ⋮ справа */
+.hol-list{padding:6px 6px 6px 12px;display:grid;gap:2px}
+.hol-row{display:flex;align-items:center;gap:8px;font-weight:600;font-size:14px}
+.hol-row .grow{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hol-form{display:grid;gap:10px;padding:4px 6px 8px 0}
+.btn.blue{background:var(--blue)}
+.btn.blue:hover{background:#1F5AB0}
 .ph{position:absolute;inset:0;display:grid;place-items:center;font-size:clamp(20px,4.2vw,40px)}
 .cell img,.preview img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain}
 .cap{position:absolute;left:0;right:0;bottom:0;z-index:2;background:rgba(255,255,255,.92);padding:3px 8px;font-size:12px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -71,6 +115,17 @@ button.cell.empty:hover .plus,button.cell.empty:focus-visible .plus{opacity:1}
   radial-gradient(circle at 75% 35%,#BFE6D8 0 26%,transparent 28%),
   radial-gradient(circle at 50% 80%,#FCE3A1 0 30%,transparent 32%),#E9EEF0}
 .lock{position:absolute;inset:0;z-index:2;display:grid;place-items:center;font-size:clamp(18px,3.4vw,30px)}
+/* Закрытый день «живой»: цветные пятна медленно плавают (запас inset:-20% не даёт увидеть край),
+   а при наведении замок покачивается — «закрыто». Соседние клетки сдвинуты по времени, чтобы не двигались одинаково */
+.cell.locked .blur{animation:drift 5s ease-in-out infinite alternate}
+.cell.locked:nth-child(3n) .blur{animation-delay:-2s}
+.cell.locked:nth-child(3n+1) .blur{animation-delay:-3.5s}
+.cell.locked:hover .lock,.cell.locked:focus-visible .lock{animation:swing .5s ease}
+@keyframes drift{
+  0%{transform:translate(0,0) rotate(0) scale(1)}
+  50%{transform:translate(6%,-5%) rotate(25deg) scale(1.08)}
+  100%{transform:translate(-5%,4%) rotate(-15deg) scale(1.02)}}
+@keyframes swing{20%{transform:rotate(-14deg)}40%{transform:rotate(11deg)}60%{transform:rotate(-7deg)}80%{transform:rotate(4deg)}}
 .legend{display:flex;flex-wrap:wrap;gap:8px 18px;margin-top:18px;color:var(--muted);font-size:13px}
 .legend span{display:flex;align-items:center;gap:6px}
 .legend i{width:16px;height:16px;border-radius:5px;border:1px solid var(--line);display:inline-block}
@@ -80,7 +135,38 @@ button.cell.empty:hover .plus,button.cell.empty:focus-visible .plus{opacity:1}
 .legend .l-today{border:2px solid var(--sun)}
 
 /* Панель друзей */
-.side{padding:20px;display:grid;gap:22px;scroll-margin-top:90px}
+/* Панель «Друзья»: выезжает справа поверх страницы */
+dialog.drawer{margin:0 0 0 auto;width:min(380px,100%);height:100%;max-height:100%;border-radius:24px 0 0 24px;overflow-y:auto;overscroll-behavior:contain}
+dialog.drawer[open]{animation:slide-in .25s cubic-bezier(.2,.9,.3,1)}
+@keyframes slide-in{from{transform:translateX(100%)}}
+.side{padding:20px;display:grid;gap:10px}
+.side-head{display:flex;align-items:center;gap:12px;margin-bottom:6px}
+.side-head h2{flex:1}
+/* Раскрывающиеся разделы */
+.sec{border:1px solid var(--line);border-radius:16px;background:var(--surface);transition:border-color .15s}
+.sec[open]{border-color:var(--ink)}
+.sec summary{list-style:none;display:flex;align-items:center;gap:8px;padding:12px 14px;font-weight:600;font-size:14px;cursor:pointer;border-radius:16px}
+.sec summary::-webkit-details-marker{display:none}
+.sec summary .grow{flex:1}
+.sec summary:hover{background:var(--bg)}
+.chev{font-size:20px;line-height:1;color:var(--muted);transition:transform .2s}
+.sec[open] .chev{transform:rotate(90deg)}
+.sec-body{padding:0 14px 14px;display:grid;gap:10px}
+.sec[open] .sec-body{animation:fade-down .2s ease}
+@keyframes fade-down{from{opacity:0;transform:translateY(-4px)}}
+.friend{transition:border-color .15s,transform .15s}
+.friend:hover{transform:translateX(2px)}
+.go{color:var(--muted);transition:transform .15s}
+/* Кнопка ⋮ у друга и её меню */
+.menu{position:relative;flex:none}
+.kebab{width:32px;height:44px;border:0;border-radius:10px;background:transparent;color:var(--muted);font-size:20px;line-height:1;transition:background .15s,color .15s}
+.kebab:hover,.kebab[aria-expanded="true"]{background:var(--bg);color:var(--ink)}
+.menu-list{position:absolute;right:0;top:calc(100% + 4px);z-index:3;min-width:220px;background:var(--surface);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow-lg);padding:6px;display:grid;animation:fade-down .15s ease}
+.menu-list button{border:0;background:transparent;text-align:left;padding:10px 12px;border-radius:10px;font-weight:500;color:var(--ink)}
+.menu-list button:hover,.menu-list button:focus-visible{background:var(--bg)}
+.menu-list .danger{color:var(--berry)}
+.menu-list .danger:hover{background:var(--berry-soft)}
+.friend:hover .go{transform:translateX(3px);color:var(--ink)}
 .side h2{font-family:var(--display);font-weight:700;font-size:18px;letter-spacing:-.02em}
 .side h3{font-size:14px;font-weight:600;margin-bottom:8px;display:flex;align-items:center}
 .field{width:100%;border:1px solid var(--line);border-radius:12px;padding:10px 12px;background:var(--surface)}
@@ -103,9 +189,6 @@ button.cell.empty:hover .plus,button.cell.empty:focus-visible .plus{opacity:1}
 .btn.danger{background:var(--surface);color:var(--berry);border:1px solid var(--berry-soft)}
 .btn.danger:hover{background:var(--berry-soft)}
 .btn:disabled{background:var(--line);color:var(--muted);cursor:default}
-.script{border-top:1px solid var(--line);padding-top:16px}
-.script summary{font-weight:600;cursor:pointer}
-.script ol{margin:10px 0 0;padding-left:20px;color:var(--muted);display:grid;gap:6px;font-size:14px}
 
 /* Окно дня */
 dialog{border:0;padding:0;border-radius:24px;width:min(520px,calc(100% - 32px));max-height:calc(100% - 32px);box-shadow:var(--shadow-lg);background:var(--surface);color:var(--ink)}
@@ -122,6 +205,10 @@ dialog::backdrop{background:rgba(34,48,58,.45)}
 .upload{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
 label.lbl{display:grid;gap:6px;font-weight:600;font-size:14px}
 label.lbl .field{font-weight:400;font-size:15px}
+/* Галочка согласия: квадратик слева, текст переносится рядом с ним */
+label.consent{display:flex;align-items:flex-start;gap:10px;font-size:14px;line-height:1.4}
+label.consent input{flex:none;width:18px;height:18px;margin:1px 0 0;accent-color:var(--berry);cursor:pointer}
+label.consent a{color:var(--berry);text-decoration:underline}
 textarea.field{resize:vertical;min-height:84px}
 .err{color:var(--berry);font-size:14px;font-weight:500}
 .access{border:1px solid var(--line);border-radius:16px;padding:14px;display:grid;gap:10px}
@@ -143,16 +230,14 @@ textarea.field{resize:vertical;min-height:84px}
 .toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);background:var(--ink);color:#fff;padding:10px 18px;border-radius:999px;font-weight:500;opacity:0;transition:opacity .2s,transform .2s;pointer-events:none;z-index:50;max-width:calc(100% - 32px);text-align:center}
 .toast.on{opacity:1;transform:translate(-50%,0)}
 
-@media (max-width:900px){
-  .wrap{grid-template-columns:minmax(0,1fr)}
-  .btn-friends{display:inline-flex;align-items:center}
-}
 @media (max-width:640px){
   .cal{padding:14px;border-radius:20px}
   .grid{gap:4px}
   .cell{border-radius:10px}
   .num{top:2px;left:2px;min-width:20px;height:20px;padding:0 4px;font-size:12px}
   .cap{display:none}
+  .hol{font-size:9px}
+  .hol span+span{font-size:9px}
   .shared{top:auto;bottom:3px;right:3px;font-size:10px;padding:1px 5px}
   .nav{width:40px;height:40px}
   .logo span{display:none}
@@ -173,3 +258,28 @@ textarea.field{resize:vertical;min-height:84px}
 .auth a{color:var(--berry);font-weight:600}
 .page-msg{text-align:center;margin-top:64px}
 .me{display:flex;align-items:center;gap:8px;font-weight:600}
+/* Подвал и юридические страницы (/privacy) */
+.site-footer{border-top:1px solid var(--line);margin-top:24px}
+.site-footer-in{max-width:1180px;margin:0 auto;padding:16px 16px calc(16px + env(safe-area-inset-bottom,0px));display:flex;flex-wrap:wrap;gap:8px 20px;font-size:14px}
+.site-footer a,.site-footer button{color:var(--muted);text-decoration:none;background:none;border:0;padding:0}
+.site-footer a:hover,.site-footer button:hover{color:var(--ink);text-decoration:underline}
+.legal{max-width:760px;margin:32px auto;padding:28px;display:grid;gap:14px}
+.legal h1{font-family:var(--display);font-size:clamp(22px,4vw,30px);letter-spacing:-.02em}
+.legal h2{font-family:var(--display);font-size:18px;margin-top:12px}
+.legal ul{margin:0;padding-left:20px;display:grid;gap:6px}
+.legal a{color:var(--berry);font-weight:600}
+.legal code{font-size:13px;background:var(--bg);padding:1px 5px;border-radius:6px}
+.legal-meta{color:var(--muted);font-size:14px}
+.legal-draft{background:var(--sun-soft);border:1px solid var(--sun);border-radius:12px;padding:10px 14px;font-weight:600}
+.legal-table{width:100%;border-collapse:collapse;font-size:14px}
+.legal-table th,.legal-table td{border:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top}
+.legal-table th{background:var(--bg)}
+.legal .todo{background:var(--berry-soft);color:var(--berry-dark);border-radius:4px;padding:0 4px}
+@media (max-width:600px){
+  .legal{margin:16px 12px;padding:20px 16px}
+  .legal-table thead{display:none}
+  .legal-table,.legal-table tbody,.legal-table tr,.legal-table td{display:block;width:100%}
+  .legal-table tr{border:1px solid var(--line);border-radius:12px;margin-bottom:10px;overflow:hidden}
+  .legal-table td{border:0;border-top:1px solid var(--line)}
+  .legal-table td:first-child{border-top:0;font-weight:600}
+}

@@ -1,5 +1,6 @@
 package com.adventcalendar.calendar.auth;
 
+import com.adventcalendar.calendar.consent.ConsentService;
 import com.adventcalendar.calendar.user.User;
 import com.adventcalendar.calendar.user.UserRepository;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -11,10 +12,13 @@ public class AuthService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final ConsentService consentService;
 
-    public AuthService(UserRepository userRepository, PasswordEncoder passwordEncoder) {
+    public AuthService(UserRepository userRepository, PasswordEncoder passwordEncoder,
+                       ConsentService consentService) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
+        this.consentService = consentService;
     }
 
     @Transactional
@@ -24,7 +28,8 @@ public class AuthService {
             throw new EmailTakenException();
         }
         String hash = passwordEncoder.encode(request.password()); // сам пароль не храним, только хеш
-        userRepository.save(new User(request.name().trim(), email, hash));
+        User user = userRepository.save(new User(request.name().trim(), email, hash));
+        consentService.recordSignUpConsents(user); // запоминаем: с чем согласился и когда
     }
 
     // «Anna@Example.com » и «anna@example.com» — один и тот же человек

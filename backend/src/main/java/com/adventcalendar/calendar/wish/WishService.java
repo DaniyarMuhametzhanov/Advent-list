@@ -5,6 +5,8 @@ import com.adventcalendar.calendar.access.WishAccess;
 import com.adventcalendar.calendar.access.WishAccessRepository;
 import com.adventcalendar.calendar.friend.FriendService;
 import com.adventcalendar.calendar.friend.NotFriendsException;
+import com.adventcalendar.calendar.holiday.Holiday;
+import com.adventcalendar.calendar.holiday.HolidayRepository;
 import com.adventcalendar.calendar.image.ImageStorage;
 import com.adventcalendar.calendar.user.UserRepository;
 import java.time.LocalDate;
@@ -26,16 +28,18 @@ public class WishService {
     private final WishAccessRepository accessRepository;
     private final AccessRequestRepository requestRepository;
     private final ImageStorage imageStorage;
+    private final HolidayRepository holidayRepository;
 
     public WishService(WishRepository wishRepository, UserRepository userRepository, FriendService friendService,
                        WishAccessRepository accessRepository, AccessRequestRepository requestRepository,
-                       ImageStorage imageStorage) {
+                       ImageStorage imageStorage, HolidayRepository holidayRepository) {
         this.wishRepository = wishRepository;
         this.userRepository = userRepository;
         this.friendService = friendService;
         this.accessRepository = accessRepository;
         this.requestRepository = requestRepository;
         this.imageStorage = imageStorage;
+        this.holidayRepository = holidayRepository;
     }
 
     @Transactional(readOnly = true)
@@ -87,8 +91,13 @@ public class WishService {
         }
         List<Wish> wishes = wishRepository.findAllByOwnerIdAndDateBetweenOrderByDateAsc(
                 ownerId, month.atDay(1), month.atEndOfMonth());
+        // Свои праздники владельца за этот месяц, по числам: { 25: ["День рождения Влада"] }
+        Map<Integer, List<String>> holidays = holidayRepository
+                .findAllByOwnerIdAndMonthOrderByDayAscIdAsc(ownerId, (short) month.getMonthValue()).stream()
+                .collect(Collectors.groupingBy(h -> h.getDate().getDayOfMonth(),
+                        Collectors.mapping(Holiday::getTitle, Collectors.toList())));
         if (isOwner) {
-            return wishes.stream().map(CalendarDayResponse::open).toList();
+            return wishes.stream().map(wish -> openDay(wish, holidays)).toList();
         }
 
         // Какие из этих дней открыты смотрящему и к каким он уже просил доступ
@@ -99,9 +108,13 @@ public class WishService {
         // Главное правило: у закрытого дня название и комментарий даже не попадают в ответ
         return wishes.stream()
                 .map(wish -> openIds.contains(wish.getId())
-                        ? CalendarDayResponse.open(wish)
+                        ? openDay(wish, holidays)   // праздники видны только в открытом дне
                         : CalendarDayResponse.closed(wish, requestedIds.contains(wish.getId())))
                 .toList();
+    }
+
+    private static CalendarDayResponse openDay(Wish wish, Map<Integer, List<String>> holidays) {
+        return CalendarDayResponse.open(wish, holidays.getOrDefault(wish.getDate().getDayOfMonth(), List.of()));
     }
 
     private WishResponse withAccess(Wish wish) {

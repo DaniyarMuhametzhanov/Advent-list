@@ -23,6 +23,7 @@ export type CalendarDayDto = {
     comment: string | null;
     imageUrl: string | null; // у закрытого дня сервер не присылает и адреса картинки
     thumbUrl: string | null;
+    holidays: string[];     // свои праздники хозяина в этот день. У закрытого дня — пустой список
 };
 
 export function searchUsers(q: string) {
