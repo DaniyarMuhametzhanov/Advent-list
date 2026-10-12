@@ -10,6 +10,12 @@ services:
       - "5434:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
+    # Проверка «база готова принимать запросы». Бэкенд ждёт её, а не просто запуска контейнера
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U advent -d advent"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
   minio:
     image: pgsty/minio:RELEASE.2026-08-04T00-00-00Z
@@ -29,6 +35,42 @@ services:
     container_name: advent-redis
     ports:
       - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # ===== Само приложение. Запускается, только если указать --profile app =====
+
+  backend:
+    profiles: ["app"]
+    build: ./backend
+    container_name: advent-backend
+    environment:
+      # Внутри Docker-сети сервисы находят друг друга по имени: postgres, redis, minio.
+      # Порт базы здесь 5432: 5434 — это «дверь» только для твоего компьютера
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/advent
+      SPRING_DATA_REDIS_HOST: redis
+      STORAGE_ENDPOINT: http://minio:9000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_started
+    restart: unless-stopped
+
+  frontend:
+    profiles: ["app"]
+    build: ./frontend
+    container_name: advent-frontend
+    ports:
+      - "8088:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
 
 volumes:
   postgres-data:
