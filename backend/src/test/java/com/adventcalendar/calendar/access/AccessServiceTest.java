@@ -6,6 +6,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.adventcalendar.calendar.cache.CalendarCaches;
 import com.adventcalendar.calendar.friend.FriendService;
 import com.adventcalendar.calendar.user.User;
 import com.adventcalendar.calendar.user.UserRepository;
@@ -34,6 +35,7 @@ class AccessServiceTest {
     @Mock WishRepository wishRepository;
     @Mock UserRepository userRepository;
     @Mock FriendService friendService;
+    @Mock CalendarCaches caches;
 
     @InjectMocks AccessService service;
 

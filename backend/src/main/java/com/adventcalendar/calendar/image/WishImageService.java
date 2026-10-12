@@ -1,6 +1,7 @@
 package com.adventcalendar.calendar.image;
 
 import com.adventcalendar.calendar.access.WishAccessRepository;
+import com.adventcalendar.calendar.cache.CalendarCaches;
 import com.adventcalendar.calendar.wish.Wish;
 import com.adventcalendar.calendar.wish.WishNotFoundException;
 import com.adventcalendar.calendar.wish.WishRepository;
@@ -16,13 +17,15 @@ public class WishImageService {
     private final WishAccessRepository accessRepository;
     private final ImageProcessor processor;
     private final ImageStorage storage;
+    private final CalendarCaches caches;
 
     public WishImageService(WishRepository wishRepository, WishAccessRepository accessRepository,
-                            ImageProcessor processor, ImageStorage storage) {
+                            ImageProcessor processor, ImageStorage storage, CalendarCaches caches) {
         this.wishRepository = wishRepository;
         this.accessRepository = accessRepository;
         this.processor = processor;
         this.storage = storage;
+        this.caches = caches;
     }
 
     // Загрузить картинку к своему желанию. Старая картинка (если была) удаляется
@@ -36,6 +39,7 @@ public class WishImageService {
         String newKey = UUID.randomUUID().toString(); // случайное имя: его нельзя угадать
         storage.save(newKey, image);
         wish.setImageKey(newKey);
+        caches.calendarChanged(me); // у дня новый адрес картинки
         if (oldKey != null) {
             storage.delete(oldKey);
         }

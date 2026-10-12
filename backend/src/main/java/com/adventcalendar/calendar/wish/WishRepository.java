@@ -12,7 +12,4 @@ public interface WishRepository extends JpaRepository<Wish, Long> {
     Optional<Wish> findByIdAndOwnerId(Long id, Long ownerId);
 
     Optional<Wish> findByOwnerIdAndDate(Long ownerId, LocalDate date);
-
-    // Желания человека с даты from по дату to включительно
-    List<Wish> findAllByOwnerIdAndDateBetweenOrderByDateAsc(Long ownerId, LocalDate from, LocalDate to);
 }

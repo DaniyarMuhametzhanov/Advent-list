@@ -1,5 +1,6 @@
 package com.adventcalendar.calendar.access;
 
+import com.adventcalendar.calendar.cache.CalendarCaches;
 import com.adventcalendar.calendar.friend.FriendService;
 import com.adventcalendar.calendar.user.UserRepository;
 import com.adventcalendar.calendar.wish.Wish;
@@ -17,17 +18,20 @@ public class AccessService {
     private final WishRepository wishRepository;
     private final UserRepository userRepository;
     private final FriendService friendService;
+    private final CalendarCaches caches;
 
     public AccessService(WishAccessRepository accessRepository,
                          AccessRequestRepository requestRepository,
                          WishRepository wishRepository,
                          UserRepository userRepository,
-                         FriendService friendService) {
+                         FriendService friendService,
+                         CalendarCaches caches) {
         this.accessRepository = accessRepository;
         this.requestRepository = requestRepository;
         this.wishRepository = wishRepository;
         this.userRepository = userRepository;
         this.friendService = friendService;
+        this.caches = caches;
     }
 
     // Владелец открывает свой день другу
@@ -39,6 +43,7 @@ public class AccessService {
         }
         if (!accessRepository.existsByWishIdAndViewerId(wishId, friendId)) {
             accessRepository.save(new WishAccess(wishId, friendId));
+            caches.accessChanged(me, friendId);
         }
         // Если друг просил доступ к этому дню, запрос выполнен — убираем его
         requestRepository.deleteByWishIdAndFromUserId(wishId, friendId);
@@ -49,6 +54,7 @@ public class AccessService {
     public void revoke(Long me, Long wishId, Long friendId) {
         findMyWish(me, wishId);
         accessRepository.deleteByWishIdAndViewerId(wishId, friendId);
+        caches.accessChanged(me, friendId);
     }
 
     // Друг просит открыть ему день

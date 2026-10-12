@@ -3,10 +3,9 @@ package com.adventcalendar.calendar.wish;
 import com.adventcalendar.calendar.access.AccessRequestRepository;
 import com.adventcalendar.calendar.access.WishAccess;
 import com.adventcalendar.calendar.access.WishAccessRepository;
+import com.adventcalendar.calendar.cache.CalendarCaches;
 import com.adventcalendar.calendar.friend.FriendService;
 import com.adventcalendar.calendar.friend.NotFriendsException;
-import com.adventcalendar.calendar.holiday.Holiday;
-import com.adventcalendar.calendar.holiday.HolidayRepository;
 import com.adventcalendar.calendar.image.ImageStorage;
 import com.adventcalendar.calendar.user.UserRepository;
 import java.time.LocalDate;
@@ -28,18 +27,20 @@ public class WishService {
     private final WishAccessRepository accessRepository;
     private final AccessRequestRepository requestRepository;
     private final ImageStorage imageStorage;
-    private final HolidayRepository holidayRepository;
+    private final OwnerCalendarService ownerCalendar;
+    private final CalendarCaches caches;
 
     public WishService(WishRepository wishRepository, UserRepository userRepository, FriendService friendService,
                        WishAccessRepository accessRepository, AccessRequestRepository requestRepository,
-                       ImageStorage imageStorage, HolidayRepository holidayRepository) {
+                       ImageStorage imageStorage, OwnerCalendarService ownerCalendar, CalendarCaches caches) {
         this.wishRepository = wishRepository;
         this.userRepository = userRepository;
         this.friendService = friendService;
         this.accessRepository = accessRepository;
         this.requestRepository = requestRepository;
         this.imageStorage = imageStorage;
-        this.holidayRepository = holidayRepository;
+        this.ownerCalendar = ownerCalendar;
+        this.caches = caches;
     }
 
     @Transactional(readOnly = true)
@@ -67,6 +68,7 @@ public class WishService {
         Wish wish = wishRepository.findByOwnerIdAndDate(ownerId, date)
                 .orElseGet(() -> new Wish(userRepository.getReferenceById(ownerId), date));
         wish.update(request.title(), request.comment());
+        caches.calendarChanged(ownerId);
         return withAccess(wishRepository.save(wish));
     }
 
@@ -77,6 +79,7 @@ public class WishService {
         Wish wish = wishRepository.findByIdAndOwnerId(id, ownerId)
                 .orElseThrow(() -> new WishNotFoundException(id));
         wishRepository.delete(wish);
+        caches.calendarChanged(ownerId);
         if (wish.getImageKey() != null) {
             imageStorage.delete(wish.getImageKey());
         }
@@ -89,32 +92,25 @@ public class WishService {
         if (!isOwner && !friendService.areFriends(viewerId, ownerId)) {
             throw new NotFriendsException();
         }
-        List<Wish> wishes = wishRepository.findAllByOwnerIdAndDateBetweenOrderByDateAsc(
-                ownerId, month.atDay(1), month.atEndOfMonth());
-        // Свои праздники владельца за этот месяц, по числам: { 25: ["День рождения Влада"] }
-        Map<Integer, List<String>> holidays = holidayRepository
-                .findAllByOwnerIdAndMonthOrderByDayAscIdAsc(ownerId, (short) month.getMonthValue()).stream()
-                .collect(Collectors.groupingBy(h -> h.getDate().getDayOfMonth(),
-                        Collectors.mapping(Holiday::getTitle, Collectors.toList())));
+        // 1. Из кэша: все дни владельца, ВСЕ открыты. Оставляем только нужный месяц
+        List<CalendarDayResponse> days = ownerCalendar.allDays(ownerId).stream()
+                .filter(day -> YearMonth.from(day.date()).equals(month))
+                .toList();
         if (isOwner) {
-            return wishes.stream().map(wish -> openDay(wish, holidays)).toList();
+            return days;
         }
 
-        // Какие из этих дней открыты смотрящему и к каким он уже просил доступ
-        List<Long> ids = wishes.stream().map(Wish::getId).toList();
-        Set<Long> openIds = new HashSet<>(accessRepository.findOpenWishIds(viewerId, ids));
+        // 2. После кэша: права смотрящего. Какие дни ему открыты и к каким он уже просил доступ
+        Set<Long> openIds = accessRepository.findOpenWishIdsOfOwner(viewerId, ownerId);
+        List<Long> ids = days.stream().map(CalendarDayResponse::wishId).toList();
         Set<Long> requestedIds = new HashSet<>(requestRepository.findRequestedWishIds(viewerId, ids));
 
-        // Главное правило: у закрытого дня название и комментарий даже не попадают в ответ
-        return wishes.stream()
-                .map(wish -> openIds.contains(wish.getId())
-                        ? openDay(wish, holidays)   // праздники видны только в открытом дне
-                        : CalendarDayResponse.closed(wish, requestedIds.contains(wish.getId())))
+        // Главное правило: у закрытого дня название, комментарий и праздники даже не попадают в ответ
+        return days.stream()
+                .map(day -> openIds.contains(day.wishId())
+                        ? day
+                        : day.closed(requestedIds.contains(day.wishId())))
                 .toList();
-    }
-
-    private static CalendarDayResponse openDay(Wish wish, Map<Integer, List<String>> holidays) {
-        return CalendarDayResponse.open(wish, holidays.getOrDefault(wish.getDate().getDayOfMonth(), List.of()));
     }
 
     private WishResponse withAccess(Wish wish) {

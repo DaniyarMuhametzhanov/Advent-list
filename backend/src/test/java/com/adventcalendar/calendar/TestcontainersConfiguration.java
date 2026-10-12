@@ -4,6 +4,7 @@ import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.context.annotation.Bean;
 import org.springframework.test.context.DynamicPropertyRegistrar;
+import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.MinIOContainer;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
@@ -20,6 +21,13 @@ public class TestcontainersConfiguration {
     @ServiceConnection
     PostgreSQLContainer postgres() {
         return new PostgreSQLContainer(DockerImageName.parse("postgres:17"));
+    }
+
+    // Redis для кэша. name = "redis": так Spring понимает, что это Redis, и сам подставит его адрес
+    @Bean
+    @ServiceConnection(name = "redis")
+    GenericContainer<?> redis() {
+        return new GenericContainer<>(DockerImageName.parse("redis:8")).withExposedPorts(6379);
     }
 
     @Bean

@@ -10,9 +10,9 @@ import static org.mockito.Mockito.when;
 
 import com.adventcalendar.calendar.access.AccessRequestRepository;
 import com.adventcalendar.calendar.access.WishAccessRepository;
+import com.adventcalendar.calendar.cache.CalendarCaches;
 import com.adventcalendar.calendar.friend.FriendService;
 import com.adventcalendar.calendar.friend.NotFriendsException;
-import com.adventcalendar.calendar.holiday.HolidayRepository;
 import com.adventcalendar.calendar.image.ImageStorage;
 import com.adventcalendar.calendar.user.User;
 import com.adventcalendar.calendar.user.UserRepository;
@@ -20,6 +20,7 @@ import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -43,7 +44,8 @@ class WishServiceTest {
     @Mock WishAccessRepository accessRepository;
     @Mock AccessRequestRepository requestRepository;
     @Mock ImageStorage imageStorage;
-    @Mock HolidayRepository holidayRepository;
+    @Mock OwnerCalendarService ownerCalendar;
+    @Mock CalendarCaches caches;
 
     @InjectMocks WishService service; // настоящий сервис, в который подставлены заглушки выше
 
@@ -59,9 +61,10 @@ class WishServiceTest {
         ReflectionTestUtils.setField(wish, "id", 5L);
     }
 
+    // «Кэш» владельца: один открытый день 10 января 2030 с праздником
     private void ownerHasOneWish() {
-        when(wishRepository.findAllByOwnerIdAndDateBetweenOrderByDateAsc(
-                OWNER_ID, MONTH.atDay(1), MONTH.atEndOfMonth())).thenReturn(List.of(wish));
+        when(ownerCalendar.allDays(OWNER_ID))
+                .thenReturn(List.of(CalendarDayResponse.open(wish, List.of("День рождения"))));
     }
 
     @Test
@@ -70,14 +73,14 @@ class WishServiceTest {
 
         assertThatThrownBy(() -> service.calendar(VIEWER_ID, OWNER_ID, MONTH))
                 .isInstanceOf(NotFriendsException.class);
-        verifyNoInteractions(wishRepository); // до базы дело даже не дошло
+        verifyNoInteractions(ownerCalendar); // до календаря (и до кэша) дело даже не дошло
     }
 
     @Test
     void closedDayHasNoTitleCommentAndImage() {
         when(friendService.areFriends(VIEWER_ID, OWNER_ID)).thenReturn(true);
         ownerHasOneWish();
-        when(accessRepository.findOpenWishIds(VIEWER_ID, List.of(5L))).thenReturn(List.of());
+        when(accessRepository.findOpenWishIdsOfOwner(VIEWER_ID, OWNER_ID)).thenReturn(Set.of());
         when(requestRepository.findRequestedWishIds(VIEWER_ID, List.of(5L))).thenReturn(List.of(5L));
 
         CalendarDayResponse day = service.calendar(VIEWER_ID, OWNER_ID, MONTH).getFirst();
@@ -88,13 +91,14 @@ class WishServiceTest {
         assertThat(day.comment()).isNull();
         assertThat(day.imageUrl()).isNull();
         assertThat(day.thumbUrl()).isNull();
+        assertThat(day.holidays()).isEmpty();
     }
 
     @Test
     void openDayShowsEverything() {
         when(friendService.areFriends(VIEWER_ID, OWNER_ID)).thenReturn(true);
         ownerHasOneWish();
-        when(accessRepository.findOpenWishIds(VIEWER_ID, List.of(5L))).thenReturn(List.of(5L));
+        when(accessRepository.findOpenWishIdsOfOwner(VIEWER_ID, OWNER_ID)).thenReturn(Set.of(5L));
         when(requestRepository.findRequestedWishIds(VIEWER_ID, List.of(5L))).thenReturn(List.of());
 
         CalendarDayResponse day = service.calendar(VIEWER_ID, OWNER_ID, MONTH).getFirst();
@@ -103,6 +107,24 @@ class WishServiceTest {
         assertThat(day.title()).isEqualTo("Секретный подарок");
         assertThat(day.comment()).isEqualTo("Никому не говорить");
         assertThat(day.thumbUrl()).contains("size=thumb");
+        assertThat(day.holidays()).containsExactly("День рождения");
+    }
+
+    @Test
+    void otherMonthsAreFilteredOut() {
+        ownerHasOneWish(); // желание в январе 2030
+
+        assertThat(service.calendar(OWNER_ID, OWNER_ID, YearMonth.of(2030, 2))).isEmpty();
+    }
+
+    @Test
+    void savingWishClearsOwnerCalendarCache() {
+        when(wishRepository.findByOwnerIdAndDate(OWNER_ID, wish.getDate())).thenReturn(Optional.of(wish));
+        when(wishRepository.save(wish)).thenReturn(wish);
+
+        service.saveForDate(OWNER_ID, wish.getDate(), new WishRequest("Новое", null));
+
+        verify(caches).calendarChanged(OWNER_ID);
     }
 
     @Test
@@ -123,6 +145,7 @@ class WishServiceTest {
 
         verify(wishRepository).delete(wish);
         verify(imageStorage).delete("abc");
+        verify(caches).calendarChanged(OWNER_ID);
     }
 
     @Test

@@ -24,6 +24,12 @@ services:
     volumes:
       - minio-data:/data
 
+  redis:
+    image: redis:8
+    container_name: advent-redis
+    ports:
+      - "6379:6379"
+
 volumes:
   postgres-data:
   minio-data:

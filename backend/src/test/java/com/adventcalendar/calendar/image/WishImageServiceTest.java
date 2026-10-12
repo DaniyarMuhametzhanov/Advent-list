@@ -9,6 +9,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.adventcalendar.calendar.access.WishAccessRepository;
+import com.adventcalendar.calendar.cache.CalendarCaches;
 import com.adventcalendar.calendar.user.User;
 import com.adventcalendar.calendar.wish.Wish;
 import com.adventcalendar.calendar.wish.WishNotFoundException;
@@ -35,6 +36,7 @@ class WishImageServiceTest {
     @Mock WishAccessRepository accessRepository;
     @Mock ImageProcessor processor;
     @Mock ImageStorage storage;
+    @Mock CalendarCaches caches;
 
     @InjectMocks WishImageService service;
 
