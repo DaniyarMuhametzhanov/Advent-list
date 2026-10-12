@@ -15,6 +15,7 @@ export type RegisterInput = {
     password: string;
     privacyAccepted: boolean; // согласие на обработку данных
     termsAccepted: boolean;   // Условия использования + 18 лет
+    extraInfo: string;        // поле-ловушка для ботов, у людей всегда пустое
 };
 
 // Кто я? Если не вошёл, сервер ответит 401 — тогда возвращаем null («никто»)
@@ -37,4 +38,4 @@ export function register(input: RegisterInput) {
 
 export function logout() {
     return request<void>('/api/auth/logout', { method: 'POST' });
-}
+}

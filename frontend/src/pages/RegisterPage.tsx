@@ -9,6 +9,8 @@ export function RegisterPage() {
     // Обе галочки по умолчанию сняты: согласие должно быть активным действием
     const [privacyAccepted, setPrivacyAccepted] = useState(false);
     const [termsAccepted, setTermsAccepted] = useState(false);
+    // Поле-ловушка для ботов: человек его не видит, поэтому оставит пустым
+    const [extraInfo, setExtraInfo] = useState('');
     const me = useMe();
     const registerMutation = useRegister();
     const navigate = useNavigate();
@@ -17,7 +19,7 @@ export function RegisterPage() {
 
     function submit(e: FormEvent) {
         e.preventDefault();
-        registerMutation.mutate({ name, email, password, privacyAccepted, termsAccepted }, { onSuccess: () => navigate('/') });
+        registerMutation.mutate({ name, email, password, privacyAccepted, termsAccepted, extraInfo }, { onSuccess: () => navigate('/') });
     }
 
     return (
@@ -48,10 +50,15 @@ export function RegisterPage() {
     checked={termsAccepted} onChange={e => setTermsAccepted(e.target.checked)} />
         <span>Мне исполнилось 18 лет, и я принимаю <a href="/terms" target="_blank" rel="noopener">Условия использования</a></span>
     </label>
+    {/* Ловушка для ботов (honeypot). Спрятана за краем экрана; Tab и экранная читалка её пропускают */}
+    <label className="trap" aria-hidden="true">Не заполняйте это поле
+        <input tabIndex={-1} autoComplete="off"
+    value={extraInfo} onChange={e => setExtraInfo(e.target.value)} />
+    </label>
     {registerMutation.isError && <p className="err">{registerMutation.error.message}</p>}
         <button className="btn" disabled={registerMutation.isPending}>Создать аккаунт</button>
     </form>
     <p className="hint">Уже есть аккаунт? <Link to="/login">Войти</Link></p>
         </main>
     );
-    }
+    }

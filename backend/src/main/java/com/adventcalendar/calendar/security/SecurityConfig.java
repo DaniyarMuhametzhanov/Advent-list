@@ -11,6 +11,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 import org.springframework.security.web.authentication.logout.HttpStatusReturningLogoutSuccessHandler;
+import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter.ReferrerPolicy;
 
 @Configuration
 public class SecurityConfig {
@@ -29,7 +30,16 @@ public class SecurityConfig {
                 // 4. Выход: POST /api/auth/logout удаляет сессию и отвечает 200
                 .logout(logout -> logout
                         .logoutUrl("/api/auth/logout")
-                        .logoutSuccessHandler(new HttpStatusReturningLogoutSuccessHandler()));
+                        .logoutSuccessHandler(new HttpStatusReturningLogoutSuccessHandler()))
+                // 5. Защитные заголовки. Часть Spring Security ставит сам (nosniff, X-Frame-Options, HSTS),
+                //    здесь добавляем ещё три
+                .headers(headers -> headers
+                        // Наш сервер отдаёт только JSON и картинки: никаких скриптов и стилей, и в рамку нас не вставить
+                        .contentSecurityPolicy(csp -> csp.policyDirectives("default-src 'none'; frame-ancestors 'none'"))
+                        // Не рассказывать другим сайтам, с какой нашей страницы перешли
+                        .referrerPolicy(referrer -> referrer.policy(ReferrerPolicy.NO_REFERRER))
+                        // Камера, микрофон и геолокация нам не нужны — запрещаем
+                        .permissionsPolicyHeader(permissions -> permissions.policy("camera=(), microphone=(), geolocation=()")));
         return http.build();
     }
 
@@ -42,4 +52,4 @@ public class SecurityConfig {
     public AuthenticationManager authenticationManager(AuthenticationConfiguration config) throws Exception {
         return config.getAuthenticationManager();
     }
-}
+}

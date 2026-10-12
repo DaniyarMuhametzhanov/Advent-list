@@ -209,6 +209,8 @@ label.lbl .field{font-weight:400;font-size:15px}
 label.consent{display:flex;align-items:flex-start;gap:10px;font-size:14px;line-height:1.4}
 label.consent input{flex:none;width:18px;height:18px;margin:1px 0 0;accent-color:var(--berry);cursor:pointer}
 label.consent a{color:var(--berry);text-decoration:underline}
+/* Поле-ловушка для ботов: не display:none (такие поля боты часто пропускают), а просто за краем экрана */
+.trap{position:absolute;left:-10000px;width:1px;height:1px;overflow:hidden}
 textarea.field{resize:vertical;min-height:84px}
 .err{color:var(--berry);font-size:14px;font-weight:500}
 .access{border:1px solid var(--line);border-radius:16px;padding:14px;display:grid;gap:10px}

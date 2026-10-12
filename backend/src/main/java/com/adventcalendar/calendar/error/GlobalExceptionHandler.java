@@ -8,15 +8,22 @@ import com.adventcalendar.calendar.friend.NotFriendsException;
 import com.adventcalendar.calendar.holiday.BadHolidayDateException;
 import com.adventcalendar.calendar.holiday.HolidayNotFoundException;
 import com.adventcalendar.calendar.image.BadImageException;
+import com.adventcalendar.calendar.security.TooManyAttemptsException;
 import com.adventcalendar.calendar.user.UserNotFoundException;
 import com.adventcalendar.calendar.auth.EmailTakenException;
 import org.springframework.security.core.AuthenticationException;
 import com.adventcalendar.calendar.wish.WishNotFoundException;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
+import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.ErrorResponse;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -26,6 +33,8 @@ import org.springframework.web.multipart.support.MissingServletRequestPartExcept
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
     @ExceptionHandler(WishNotFoundException.class)
     public ProblemDetail handleNotFound(WishNotFoundException ex) {
@@ -99,5 +108,33 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ProblemDetail handleUnreadable(HttpMessageNotReadableException ex) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, "Не получилось прочитать JSON в теле запроса");
+    }
+
+    // 429: слишком много попыток входа. Заголовок Retry-After говорит, через сколько секунд можно снова
+    @ExceptionHandler(TooManyAttemptsException.class)
+    public ResponseEntity<ProblemDetail> handleTooManyAttempts(TooManyAttemptsException ex) {
+        long seconds = ex.getRetryAfter().toSeconds();
+        long minutes = Math.max(1, (seconds + 59) / 60); // округляем вверх: 61 секунда → 2 минуты
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.TOO_MANY_REQUESTS,
+                "Слишком много попыток входа. Попробуйте через " + minutes + " мин.");
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .header(HttpHeaders.RETRY_AFTER, String.valueOf(seconds))
+                .body(problem);
+    }
+
+    // Всё, что мы НЕ предусмотрели выше. Клиенту — только общая фраза и короткий код,
+    // а подробности (текст ошибки, стек вызовов) — только в лог сервера
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<ProblemDetail> handleUnexpected(Exception ex) {
+        // Обычные ошибки Spring (404 «нет такого адреса», 405 «не тот метод» и т.п.) уже знают
+        // свой статус и ничего лишнего не рассказывают. Отдаём их как есть, а не превращаем в 500
+        if (ex instanceof ErrorResponse known) {
+            return ResponseEntity.status(known.getStatusCode()).headers(known.getHeaders()).body(known.getBody());
+        }
+        String errorId = UUID.randomUUID().toString().substring(0, 8);
+        log.error("Непредвиденная ошибка, код {}", errorId, ex); // ex последним: в лог попадёт весь стек
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.INTERNAL_SERVER_ERROR,
+                "Что-то пошло не так. Код ошибки: " + errorId);
+        return ResponseEntity.internalServerError().body(problem);
     }
 }

@@ -25,6 +25,9 @@ public record RegisterRequest(
 
         // Галочка «принимаю Условия использования и мне есть 18 лет»
         @AssertTrue(message = "Нужно принять Условия использования и подтвердить возраст 18+")
-        boolean termsAccepted
+        boolean termsAccepted,
+
+        // Поле-ловушка (honeypot). Человек его не видит и оставляет пустым, а бот заполняет
+        String extraInfo
 ) {
-}
+}
