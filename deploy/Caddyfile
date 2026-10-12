@@ -1,0 +1,13 @@
+# Caddy: принимает запросы из интернета и передаёт их nginx (сервис frontend).
+# {$DOMAIN} — домен из файла .env. Для него Caddy сам получит и будет продлевать HTTPS-сертификат
+{$DOMAIN} {
+	# Браузер запомнит: на этот сайт ходить только по HTTPS (HSTS). 31536000 секунд = год
+	header Strict-Transport-Security "max-age=31536000"
+	# Не писать в ответах, что сервер — Caddy
+	header -Server
+
+	reverse_proxy frontend:80
+
+	# Журнал запросов (кто, когда, какой адрес). Смотреть: docker compose ... logs caddy
+	log
+}

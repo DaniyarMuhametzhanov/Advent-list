@@ -1,0 +1,102 @@
+# Всё приложение для настоящего сервера (этап 14).
+# Запуск на сервере: docker compose -f docker-compose.prod.yml up -d --build
+# Пароли и домен берутся из файла .env рядом с этим файлом (образец — .env.example)
+name: advent
+
+# Общие настройки логов: каждый файл до 10 МБ, хранить 3 файла. Иначе логи когда-нибудь займут весь диск
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  # Единственная «дверь» в интернет. Принимает запросы на 80 и 443, сам получает
+  # HTTPS-сертификат для домена и передаёт всё в frontend (nginx)
+  caddy:
+    image: caddy:2
+    environment:
+      DOMAIN: ${DOMAIN:?впиши DOMAIN в .env}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"   # HTTP/3
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data       # здесь лежат сертификаты. Потеряешь — Caddy просто получит новые
+      - caddy-config:/config
+    depends_on:
+      - frontend
+    restart: unless-stopped
+    logging: *logging
+
+  # nginx с фронтендом. Портов наружу нет: к нему ходит только Caddy
+  frontend:
+    build: ./frontend
+    depends_on:
+      - backend
+    restart: unless-stopped
+    logging: *logging
+
+  backend:
+    build: ./backend
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      DB_PASSWORD: ${DB_PASSWORD:?впиши DB_PASSWORD в .env}
+      STORAGE_SECRET_KEY: ${STORAGE_SECRET_KEY:?впиши STORAGE_SECRET_KEY в .env}
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/advent
+      SPRING_DATA_REDIS_HOST: redis
+      STORAGE_ENDPOINT: http://minio:9000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_started
+    restart: unless-stopped
+    logging: *logging
+
+  # База, Redis и MinIO — без ports: из интернета до них не достучаться
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: advent
+      POSTGRES_USER: advent
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?впиши DB_PASSWORD в .env}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U advent -d advent"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+    logging: *logging
+
+  redis:
+    image: redis:8
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+    logging: *logging
+
+  minio:
+    image: pgsty/minio:RELEASE.2026-08-04T00-00-00Z
+    command: server /data
+    environment:
+      MINIO_ROOT_USER: advent
+      MINIO_ROOT_PASSWORD: ${STORAGE_SECRET_KEY:?впиши STORAGE_SECRET_KEY в .env}
+    volumes:
+      - minio-data:/data
+    restart: unless-stopped
+    logging: *logging
+
+volumes:
+  postgres-data:
+  minio-data:
+  caddy-data:
+  caddy-config:

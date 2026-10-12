@@ -22,3 +22,6 @@ frontend/dist/
 frontend/coverage/
 frontend/playwright-report/
 frontend/test-results/
+
+# ===== Сервер (этап 14) =====
+backups/
