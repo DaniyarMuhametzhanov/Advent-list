@@ -1,0 +1,11 @@
+# Запуск на своём компьютере с Tailscale Funnel (этап 14, вариант «дома»).
+# Добавляется поверх docker-compose.prod.yml:
+#   docker compose -f docker-compose.prod.yml -f docker-compose.home.yml up -d --build
+# HTTPS делает Tailscale, поэтому Caddy не нужен, а nginx открываем только для своего компьютера
+services:
+  caddy:
+    profiles: ["server"]          # сервис с профилем не запускается, пока профиль не указан явно
+
+  frontend:
+    ports:
+      - "127.0.0.1:8088:80"       # 127.0.0.1 — дверь только изнутри компьютера, не для соседей по Wi-Fi
