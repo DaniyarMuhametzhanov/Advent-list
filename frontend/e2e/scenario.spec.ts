@@ -17,6 +17,7 @@ const PNG = Buffer.from(
 async function register(browser: Browser, name: string, login: string): Promise<Page> {
     const page = await (await browser.newContext()).newPage();
     await page.goto('/register');
+    await page.getByRole('button', { name: 'Отклонить' }).click();   // баннер cookie закрывает низ страницы
     await page.getByLabel('Имя').fill(name);
     await page.getByLabel('Email').fill(`${login}-${run}@e2e.test`); // в email только латиница
     await page.getByLabel('Пароль').fill('password123');
