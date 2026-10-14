@@ -59,11 +59,7 @@ export function Calendar(props: Props) {
                 <button className="nav" onClick={props.onNext} aria-label="Следующий месяц">→</button>
             </div>
 
-            <p className="sub">
-                {props.status ?? (isOwn
-                    ? 'Нажмите на число, чтобы добавить или изменить желание.'
-                    : <>Вы — <b>{USERS[me].name}</b> и смотрите адвент-календарь <b>{USERS[owner].gen}</b>. Закрытые дни отмечены замком.</>)}
-            </p>
+            {props.status && <p className="sub">{props.status}</p>}
 
             <div className="grid">
                 {DOW.map((d, i) => <div key={d} className={i > 4 ? 'dow we' : 'dow'}>{d}</div>)}

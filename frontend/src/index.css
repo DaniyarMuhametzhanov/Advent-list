@@ -49,12 +49,12 @@ h1,h2,h3,p{margin:0}
 .tab[data-active="true"] .tab-x:hover{background:rgba(255,255,255,.18);color:#fff}
 .ava{width:22px;height:22px;border-radius:50%;display:inline-grid;place-items:center;color:#fff;font-size:12px;font-weight:600;flex:none}
 .ava.lg{width:36px;height:36px;font-size:15px}
-.cal-head{display:flex;align-items:center;gap:12px;margin-bottom:6px}
+.cal-head{display:flex;align-items:center;gap:12px;margin-bottom:18px}
 .month{font-family:var(--display);font-weight:700;font-size:clamp(24px,4.6vw,42px);letter-spacing:-.03em;line-height:1.1;margin-right:auto;text-wrap:balance}
 .month span{color:var(--muted);font-weight:500}
 .nav{width:44px;height:44px;border-radius:50%;border:1px solid var(--line);background:var(--surface);font-size:18px;flex:none}
 .nav:hover{background:var(--bg)}
-.sub{color:var(--muted);margin-bottom:18px;min-height:1.45em}
+.sub{color:var(--muted);margin:-12px 0 18px}
 .sub b{color:var(--ink);font-weight:600}
 .grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:8px}
 .dow{text-align:center;color:var(--muted);font-size:13px;font-weight:500;padding-bottom:2px}
