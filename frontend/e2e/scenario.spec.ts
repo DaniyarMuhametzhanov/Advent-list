@@ -62,7 +62,7 @@ test('Анна открывает день Борису, и он видит ка
         await anna.reload();
         await day15(anna, 'добавить желание').click();
         await anna.locator('input[type=file]').setInputFiles({ name: 'gift.png', mimeType: 'image/png', buffer: PNG });
-        await anna.getByLabel('Название желания').fill(TITLE);
+        await anna.getByLabel('Название подарка').fill(TITLE);
         await anna.getByLabel('Комментарий / описание').fill(COMMENT);
         await anna.getByRole('button', { name: 'Сохранить' }).click();
 

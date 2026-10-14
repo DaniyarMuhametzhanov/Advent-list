@@ -29,14 +29,14 @@ describe('DayModal: свой день', () => {
 
         await userEvent.click(screen.getByRole('button', { name: 'Сохранить' }));
 
-        expect(screen.getByText('Введите название желания.')).toBeInTheDocument();
+        expect(screen.getByText('Введите название подарка.')).toBeInTheDocument();
         expect(props.onSave).not.toHaveBeenCalled();
     });
 
     it('сохраняет название, комментарий и выбранных друзей', async () => {
         const props = renderModal();
 
-        await userEvent.type(screen.getByLabelText('Название желания'), '  Наушники ');
+        await userEvent.type(screen.getByLabelText('Название подарка'), '  Наушники ');
         await userEvent.type(screen.getByLabelText('Комментарий / описание'), 'Беспроводные');
         await userEvent.click(screen.getByLabelText('Борис'));
         await userEvent.click(screen.getByRole('button', { name: 'Сохранить' }));
@@ -119,7 +119,7 @@ describe('DayModal: чужой день', () => {
         const props = renderModal({ me: 'boris', owner: 'anna', myFriends: ['anna'], wish: { ...wish, title: '', comment: '' } });
 
         expect(screen.getByText(/Владелец пока не открыл вам этот день/)).toBeInTheDocument();
-        expect(screen.queryByLabelText('Название желания')).not.toBeInTheDocument();
+        expect(screen.queryByLabelText('Название подарка')).not.toBeInTheDocument();
 
         await userEvent.click(screen.getByRole('button', { name: 'Попросить доступ' }));
         expect(props.onRequestAccess).toHaveBeenCalledWith('2026-10-15');

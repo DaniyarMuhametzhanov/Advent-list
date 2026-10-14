@@ -57,10 +57,6 @@ export function DayModal(props: Props) {
     else if (!isLocked && wish) content = <ReadOnlyDay wish={wish} />;
     else content = <LockedDay owner={owner} asked={props.alreadyAsked} onAsk={() => props.onRequestAccess(date)} />;
 
-    const subtitle = isOwn
-        ? (wish ? 'Ваше желание на этот день' : 'Новое желание')
-        : isLocked ? `Календарь ${USERS[owner].gen}` : `Желание ${USERS[owner].gen}, только для чтения`;
-
     return (
         <dialog ref={dialogRef} aria-labelledby="dlgTitle"
                 onClose={onClose}                                         // закрыли клавишей Esc
@@ -72,7 +68,6 @@ export function DayModal(props: Props) {
                         {officialHoliday(date) && <p className="hol-tag">🎉 {officialHoliday(date)}</p>}
                         {/* В чужом открытом дне — праздники хозяина. В своём они ниже, в списке с меню ⋮ */}
                         {!isOwn && wish?.holidays?.map((h, i) => <p className="hol-tag" key={i}>🎂 {h}</p>)}
-                        <p>{subtitle}</p>
                     </div>
                     <button className="x" onClick={onClose} aria-label="Закрыть">✕</button>
                 </div>
@@ -153,11 +148,11 @@ function OwnDay({ date, wish, myFriends, onSave, onDelete, onSetAccess, onToast,
                 </div>
             </div>
 
-            <label className="lbl" htmlFor="fTitle">Название желания
+            <label className="lbl" htmlFor="fTitle">Название подарка
                 <input className="field" id="fTitle" maxLength={60} placeholder="Например, наушники"
                        value={title} onChange={e => { setTitle(e.target.value); setShowError(false); }} />
             </label>
-            {showError && <p className="err">Введите название желания.</p>}
+            {showError && <p className="err">Введите название подарка.</p>}
 
             <label className="lbl" htmlFor="fComment">Комментарий / описание
                 <textarea className="field" id="fComment" placeholder="Размер, цвет, ссылка, пожелания"
