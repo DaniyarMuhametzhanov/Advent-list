@@ -1,41 +1,29 @@
-// Запросы про вход: кто я, войти, зарегистрироваться, выйти.
+// Запросы про вход: кто я и регистрация. Входит человек через Telegram, без пароля
 import { HttpError, request } from './http';
 
-// Это MeResponse из Java
+// Что сервер рассказывает о вошедшем (worker/src/routes/auth.ts)
 export type Me = {
     id: number;
-    name: string;
-    email: string;
+    name: string;            // имя из Telegram
+    username: string | null; // @ник в Telegram, если есть
 };
 
-export type LoginInput = { email: string; password: string };
 export type RegisterInput = {
-    name: string;
-    email: string;
-    password: string;
     privacyAccepted: boolean; // согласие на обработку данных
     termsAccepted: boolean;   // Условия использования + 18 лет
-    extraInfo: string;        // поле-ловушка для ботов, у людей всегда пустое
 };
 
-// Кто я? Если не вошёл, сервер ответит 401 — тогда возвращаем null («никто»)
+// Кто я? Если человек из Telegram ещё не создал аккаунт, сервер ответит 404 — тогда null
 export async function fetchMe(): Promise<Me | null> {
     try {
         return await request<Me>('/api/me');
     } catch (e) {
-        if (e instanceof HttpError && e.status === 401) return null;
+        if (e instanceof HttpError && e.status === 404) return null;
         throw e;
     }
 }
 
-export function login(input: LoginInput) {
-    return request<Me>('/api/auth/login', { method: 'POST', body: JSON.stringify(input) });
-}
-
+// Имя и id сервер берёт из данных Telegram, а не из запроса. Мы присылаем только галочки
 export function register(input: RegisterInput) {
     return request<Me>('/api/auth/register', { method: 'POST', body: JSON.stringify(input) });
 }
-
-export function logout() {
-    return request<void>('/api/auth/logout', { method: 'POST' });
-}

@@ -38,6 +38,6 @@ describe('toWishesByDate', () => {
         }]);
 
         expect(result['2026-10-05'].comment).toBe(''); // null → пустая строка
-        expect(result['2026-10-05'].access).toEqual(['boris']); // id 2 в базе — это Борис
+        expect(result['2026-10-05'].access).toEqual(['user2']); // id 2 в базе → 'user2'
     });
 });

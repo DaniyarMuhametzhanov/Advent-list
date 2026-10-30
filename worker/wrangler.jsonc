@@ -1,0 +1,45 @@
+// Настройки Cloudflare Worker: как называется, какие у него база, хранилище и переменные.
+// Команда `npx wrangler deploy` читает этот файл и выкладывает всё в Cloudflare
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "advent-calendar",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-07-01",
+
+  // Фронтенд (собранный React из ../frontend/dist) отдаёт сам Cloudflare, бесплатно и без нашего кода.
+  // Запросы на /api/* сначала идут в наш код (src/index.ts).
+  // single-page-application: на любой неизвестный адрес (например, /privacy) отдать index.html,
+  // дальше разберётся React Router
+  "assets": {
+    "directory": "../frontend/dist",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*"]
+  },
+
+  // База данных D1 (это SQLite). database_id появится после `npx wrangler d1 create advent` —
+  // скопируйте его сюда (см. docs/stage-15.md)
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "advent",
+      "database_id": "ВСТАВЬТЕ-СЮДА-ID-БАЗЫ",
+      "migrations_dir": "migrations"
+    }
+  ],
+
+  // Хранилище картинок R2 (как MinIO на прошлых этапах)
+  "r2_buckets": [
+    { "binding": "IMAGES", "bucket_name": "advent-wish-images" }
+  ],
+
+  // Обычные (не секретные) настройки. Секреты (BOT_TOKEN, WEBHOOK_SECRET) сюда НЕ пишем:
+  // они задаются командой `npx wrangler secret put ...`
+  "vars": {
+    // Версии юридических документов. Должны совпадать с PRIVACY_VERSION и TERMS_VERSION во frontend/src/legal
+    "PRIVACY_VERSION": "0.1-draft",
+    "TERMS_VERSION": "0.1-draft"
+  },
+
+  // Журнал (логи) запросов и ошибок можно смотреть в панели Cloudflare
+  "observability": { "enabled": true }
+}

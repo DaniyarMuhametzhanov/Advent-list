@@ -10,7 +10,7 @@ export default defineConfig({
     },
     projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
     // Перед тестами запустить фронтенд (или взять уже запущенный).
-    // Бэкенд, PostgreSQL и MinIO запускаешь сам — см. docs/stage-10.md
+    // Бэкенд (Worker) запускаешь сам: cd worker && npm run dev — см. docs/stage-15.md
     webServer: {
         command: 'npm run dev',
         url: 'http://localhost:5173',

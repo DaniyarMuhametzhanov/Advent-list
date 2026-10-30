@@ -10,9 +10,13 @@ import { RequireAuth } from './components/RequireAuth.tsx'
 import { PrivacyPage } from './pages/PrivacyPage.tsx'
 import { TermsPage } from './pages/TermsPage.tsx'
 import { Footer } from './components/Footer.tsx'
+import { initTelegram } from './lib/telegram.ts'
 
 // Хранилище ответов сервера для всего приложения
 const queryClient = new QueryClient()
+
+// Внутри Telegram: сказать «готово» и развернуть окно
+initTelegram()
 
 createRoot(document.getElementById('root')!).render(
     <StrictMode>

@@ -6,10 +6,10 @@ import { defineConfig } from 'vite'
 export default defineConfig({
   plugins: [react()],
   server: {
-    // Все запросы, которые начинаются с /api, Vite передаёт серверу Spring Boot.
+    // Все запросы, которые начинаются с /api, Vite передаёт нашему Worker (cd worker && npm run dev).
     // Для браузера это один и тот же адрес localhost:5173, поэтому CORS не мешает.
     proxy: {
-      '/api': 'http://localhost:8080',
+      '/api': 'http://localhost:8787',
     },
   },
   // Настройки Vitest (тесты компонентов)
