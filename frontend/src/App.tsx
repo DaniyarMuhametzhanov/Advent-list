@@ -3,7 +3,7 @@ import type { UserId, Wish } from './types';
 import type { FriendRequestDto } from './api/friends';
 import type { AccessRequestDto } from './api/access';
 import { USERS, fakeIdFor } from './data/fakeData';
-import { useLogout, useMe } from './api/useAuth';
+import { useMe } from './api/useAuth';
 import { dateKey, formatDate } from './lib/dates';
 import { Header } from './components/Header';
 import { Calendar } from './components/Calendar';
@@ -28,7 +28,6 @@ export default function App() {
   const user = useMe().data!;
   const me = fakeIdFor(user);
   const [selected, setSelected] = useState<UserId>(me);  // чей календарь выбрали
-  const logoutMutation = useLogout();
   const [month, setMonth] = useState(() => {
     const now = new Date();
     return { year: now.getFullYear(), month: now.getMonth() };
@@ -138,9 +137,6 @@ export default function App() {
     setMonth({ year: d.getFullYear(), month: d.getMonth() });
   }
 
-  function logout() {
-    logoutMutation.mutate(); // на /login отправит RequireAuth, когда узнает, что мы вышли
-  }
 
   // Окно закрыли, подсказку показали
   function done(text: string) {
@@ -260,7 +256,7 @@ export default function App() {
 
   return (
       <>
-        <Header me={me} badge={badge} friendsOpen={friendsOpen} onLogout={logout}
+        <Header me={me} badge={badge} friendsOpen={friendsOpen}
                 onFriendsClick={() => setFriendsOpen(true)} />
 
         <main className="wrap">

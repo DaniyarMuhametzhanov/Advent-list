@@ -1,0 +1,9 @@
+# Защитные заголовки для страниц фронтенда. Cloudflare читает этот файл сам (как раньше nginx — security-headers.conf).
+# CSP: скрипты — только наши и скрипт Telegram (telegram.org). Стили и шрифты — ещё с Google Fonts.
+# Картинки — ещё из data: и blob: (так браузер показывает выбранный файл до загрузки).
+# frame-ancestors: вставлять нас в рамку (iframe) можно только Telegram — так открывается Mini App в веб-версии
+/*
+  Content-Security-Policy: default-src 'self'; script-src 'self' https://telegram.org; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors https://web.telegram.org https://*.telegram.org
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: no-referrer
+  Permissions-Policy: camera=(), microphone=(), geolocation=()

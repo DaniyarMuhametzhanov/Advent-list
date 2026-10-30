@@ -40,8 +40,34 @@ jobs:
       - run: npm test
       - run: npm run build
 
+  worker:
+    name: Worker (Cloudflare) — проверка типов, тесты, пробная сборка
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: |
+            frontend/package-lock.json
+            worker/package-lock.json
+      # Worker отдаёт собранный фронтенд, поэтому сначала собираем его
+      - run: npm ci && npm run build
+        working-directory: frontend
+      - run: npm ci
+        working-directory: worker
+      - run: npm run typecheck
+        working-directory: worker
+      # Тесты запускают Worker на настоящем движке Cloudflare (Miniflare) с временной базой D1 и R2
+      - run: npm test
+        working-directory: worker
+      # Пробная сборка без выкладки: проверяет wrangler.jsonc и что код собирается
+      - run: npx wrangler deploy --dry-run --outdir dist
+        working-directory: worker
+
   docker:
-    name: Docker — сборка и запуск
+    name: Docker — сборка и запуск (старая Java-версия)
     needs: [backend, frontend]
     runs-on: ubuntu-latest
     steps:

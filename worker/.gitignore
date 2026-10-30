@@ -1,0 +1,5 @@
+node_modules/
+.wrangler/
+dist/
+# Секреты для локального запуска (токен бота). В git не попадают
+.dev.vars

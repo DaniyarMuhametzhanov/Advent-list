@@ -1,7 +1,7 @@
 import { expect, test, type Browser, type Page } from '@playwright/test';
 
 // «Сценарий показа» из макета, но с двумя настоящими людьми в двух разных браузерах.
-// Каждый запуск создаёт новых пользователей, поэтому тест можно гонять сколько угодно раз.
+// Каждый запуск создаёт новых пользователей (с новыми «Telegram id»), поэтому тест можно гонять сколько угодно раз.
 const run = Date.now().toString(36);   // например 'mgk3x1a' — уникальная метка запуска
 const ANNA = `Анна ${run}`;
 const BORIS = `Борис ${run}`;
@@ -13,16 +13,20 @@ const PNG = Buffer.from(
     'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAAAFklEQVR4nGM4bppHEmIY1TCqYfhqAADMhmoQBmZmNwAAAABJRU5ErkJggg==',
     'base64');
 
-// Свой браузер (контекст) для каждого человека: свои cookie, своя сессия
-async function register(browser: Browser, name: string, login: string): Promise<Page> {
+// Каждому человеку — свой «Telegram id». Вход без Telegram работает только в разработке:
+// фронтенд в режиме npm run dev и Worker с DEV_AUTH=1 (worker/.dev.vars). См. frontend/src/lib/telegram.ts
+const devAuth = (telegramId: number, name: string) => `dev ${telegramId}:${encodeURIComponent(name)}`;
+const ANNA_TG = Date.now() % 1_000_000_000;
+const BORIS_TG = ANNA_TG + 1;
+
+// Свой браузер (контекст) для каждого человека
+async function register(browser: Browser, name: string, telegramId: number): Promise<Page> {
     const page = await (await browser.newContext()).newPage();
-    await page.goto('/register');
-    await page.getByLabel('Имя').fill(name);
-    await page.getByLabel('Email').fill(`${login}-${run}@e2e.test`); // в email только латиница
-    await page.getByLabel('Пароль').fill('password123');
+    await page.goto(`/?as=${telegramId}:${encodeURIComponent(name)}`); // «открыли из Telegram» впервые
+    await expect(page.getByRole('heading', { name: 'Добро пожаловать!' })).toBeVisible();
     await page.getByLabel(/обработку моих персональных данных/).check();
     await page.getByLabel(/принимаю Условия использования/).check();
-    await page.getByRole('button', { name: 'Создать аккаунт' }).click();
+    await page.getByRole('button', { name: 'Начать' }).click();
     await expect(page.getByRole('button', { name: 'Мой календарь' })).toBeVisible();
     return page;
 }
@@ -39,8 +43,8 @@ function day15(page: Page, state: string | RegExp) {
 }
 
 test('Анна открывает день Борису, и он видит картинку и комментарий', async ({ browser }) => {
-    const anna = await register(browser, ANNA, 'anna');
-    const boris = await register(browser, BORIS, 'boris');
+    const anna = await register(browser, ANNA, ANNA_TG);
+    const boris = await register(browser, BORIS, BORIS_TG);
 
     await test.step('Анна и Борис становятся друзьями', async () => {
         await openFriends(anna);
@@ -82,9 +86,11 @@ test('Анна открывает день Борису, и он видит ка
     });
 
     await test.step('Сервер не отдаёт Борису закрытое даже напрямую через API', async () => {
-        const annaId = (await (await anna.request.get('/api/me')).json()).id;
+        const annaId = (await (await anna.request.get('/api/me',
+            { headers: { Authorization: devAuth(ANNA_TG, ANNA) } })).json()).id;
         const month = new Date().toISOString().slice(0, 7); // '2026-10'
-        const response = await boris.request.get(`/api/calendars/${annaId}?month=${month}`);
+        const response = await boris.request.get(`/api/calendars/${annaId}?month=${month}`,
+            { headers: { Authorization: devAuth(BORIS_TG, BORIS) } });
         expect(response.ok()).toBe(true);
         const body = await response.text();
         expect(body).not.toContain(TITLE);

@@ -1,0 +1,9 @@
+# Секреты для локального запуска (npm run dev). Скопируйте этот файл в .dev.vars
+# (cp .dev.vars.example .dev.vars) — .dev.vars в git не попадает.
+
+# Токен бота. Для локального запуска подойдёт любой текст, настоящий нужен только в Cloudflare
+BOT_TOKEN=123456:local-test-token
+WEBHOOK_SECRET=local-webhook-secret
+
+# Вход без Telegram: http://localhost:5173/?as=1001:Анна. ТОЛЬКО для своего компьютера!
+DEV_AUTH=1
