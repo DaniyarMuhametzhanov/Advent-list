@@ -1,5 +1,6 @@
 // Всё общение с сервером про желания — в одном файле.
 import { request } from './http';
+import { resizeImage } from '../lib/resizeImage';
 
 // Так желание приходит с сервера (это WishResponse из Java)
 export type WishDto = {
@@ -26,10 +27,13 @@ export function saveWish(date: string, input: WishInput) {
     return request<WishDto>(`/api/wishes/${date}`, { method: 'PUT', body: JSON.stringify(input) });
 }
 
-// Картинку отправляем как форму с файлом, а не как JSON
-export function uploadWishImage(id: number, file: File) {
+// Картинку отправляем как форму с файлами, а не как JSON.
+// Сначала браузер уменьшает её сам: сервер принимает уже готовые большую картинку и превью
+export async function uploadWishImage(id: number, file: File) {
+    const { full, thumb } = await resizeImage(file);
     const form = new FormData();
-    form.append('file', file); // 'file' — то же имя, что в @RequestParam("file") на сервере
+    form.append('full', full, 'full.jpg');    // имена full и thumb ждёт сервер (worker/src/routes/images.ts)
+    form.append('thumb', thumb, 'thumb.jpg');
     return request<WishDto>(`/api/wishes/${id}/image`, { method: 'POST', body: form });
 }
 

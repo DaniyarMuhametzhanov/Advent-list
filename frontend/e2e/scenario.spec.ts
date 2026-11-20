@@ -13,16 +13,52 @@ const PNG = Buffer.from(
     'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAAAFklEQVR4nGM4bppHEmIY1TCqYfhqAADMhmoQBmZmNwAAAABJRU5ErkJggg==',
     'base64');
 
-// Свой браузер (контекст) для каждого человека: свои cookie, своя сессия
-async function register(browser: Browser, name: string, login: string): Promise<Page> {
-    const page = await (await browser.newContext()).newPage();
+// Администратор из worker/.dev.vars (ADMIN_EMAILS=admin@example.com). Ему регистрироваться можно всегда
+const ADMIN = 'admin@example.com';
+const PASSWORD = 'password123';
+const emailOf = (login: string) => `${login}-${run}@e2e.test`; // в email только латиница
+
+// Заполнить форму регистрации. Что будет дальше — проверяет тот, кто вызвал
+async function fillRegister(page: Page, name: string, email: string) {
     await page.goto('/register');
     await page.getByLabel('Имя').fill(name);
-    await page.getByLabel('Email').fill(`${login}-${run}@e2e.test`); // в email только латиница
-    await page.getByLabel('Пароль').fill('password123');
+    await page.getByLabel('Email').fill(email);
+    await page.getByLabel('Пароль').fill(PASSWORD);
     await page.getByLabel(/обработку моих персональных данных/).check();
     await page.getByLabel(/принимаю Условия использования/).check();
     await page.getByRole('button', { name: 'Создать аккаунт' }).click();
+}
+
+// Администратор входит. В первый запуск его ещё нет в базе — тогда он регистрируется
+async function adminLogin(browser: Browser): Promise<Page> {
+    const page = await (await browser.newContext()).newPage();
+    await fillRegister(page, 'Админ', ADMIN);
+    const calendar = page.getByRole('button', { name: 'Мой календарь' });
+    const taken = page.getByText('Этот email уже зарегистрирован');
+    await expect(calendar.or(taken)).toBeVisible();
+    if (await taken.isVisible()) {
+        await page.goto('/login');
+        await page.getByLabel('Email').fill(ADMIN);
+        await page.getByLabel('Пароль').fill(PASSWORD);
+        await page.getByRole('button', { name: 'Войти' }).click();
+        await expect(calendar).toBeVisible();
+    }
+    return page;
+}
+
+// Администратор на странице «Доступ» разрешает email регистрироваться
+async function allow(admin: Page, email: string) {
+    await admin.getByRole('link', { name: 'Доступ' }).click();
+    await admin.getByLabel('Разрешить email').fill(email);
+    await admin.getByRole('button', { name: 'Разрешить' }).click();
+    await expect(admin.getByRole('list', { name: 'Разрешённые email' }).getByText(email)).toBeVisible();
+    await admin.getByRole('link', { name: '← К календарю' }).click();
+}
+
+// Свой браузер (контекст) для каждого человека: свои cookie, своя сессия
+async function register(browser: Browser, name: string, login: string): Promise<Page> {
+    const page = await (await browser.newContext()).newPage();
+    await fillRegister(page, name, emailOf(login));
     await expect(page.getByRole('button', { name: 'Мой календарь' })).toBeVisible();
     return page;
 }
@@ -39,6 +75,18 @@ function day15(page: Page, state: string | RegExp) {
 }
 
 test('Анна открывает день Борису, и он видит картинку и комментарий', async ({ browser }) => {
+    await test.step('Без приглашения зарегистрироваться нельзя', async () => {
+        const page = await (await browser.newContext()).newPage();
+        await fillRegister(page, ANNA, emailOf('anna'));
+        await expect(page.getByText('Регистрация по приглашению. Попросите администратора добавить ваш email')).toBeVisible();
+        await page.context().close();
+    });
+
+    const admin = await adminLogin(browser);
+    await test.step('Администратор разрешает Анне и Борису регистрироваться', async () => {
+        await allow(admin, emailOf('anna'));
+        await allow(admin, emailOf('boris'));
+    });
     const anna = await register(browser, ANNA, 'anna');
     const boris = await register(browser, BORIS, 'boris');
 
@@ -82,6 +130,7 @@ test('Анна открывает день Борису, и он видит ка
     });
 
     await test.step('Сервер не отдаёт Борису закрытое даже напрямую через API', async () => {
+        // page.request берёт cookie этого браузера: запрос идёт от имени Анны или Бориса
         const annaId = (await (await anna.request.get('/api/me')).json()).id;
         const month = new Date().toISOString().slice(0, 7); // '2026-10'
         const response = await boris.request.get(`/api/calendars/${annaId}?month=${month}`);

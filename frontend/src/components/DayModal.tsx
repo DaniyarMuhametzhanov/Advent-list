@@ -85,7 +85,8 @@ export function DayModal(props: Props) {
 
 // Те же правила, что на сервере: проверяем заранее, чтобы не гонять большой файл зря
 const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif'];
-const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5 МБ
+// Большой файл не страшен: перед отправкой браузер сам уменьшит его (lib/resizeImage.ts)
+const MAX_IMAGE_SIZE = 20 * 1024 * 1024; // 20 МБ
 const NO_IMAGE: WishImage = { emoji: '🎁', bg: '#FBE4EC' };
 
 /* ---------- Свой день: форма ---------- */
@@ -106,7 +107,7 @@ function OwnDay({ date, wish, myFriends, onSave, onDelete, onSetAccess, onToast,
     function readFile(file: File | undefined) {
         if (!file) return;
         if (!IMAGE_TYPES.includes(file.type)) { onToast('Подойдут картинки JPG, PNG или GIF'); return; }
-        if (file.size > MAX_IMAGE_SIZE) { onToast('Картинка больше 5 МБ'); return; }
+        if (file.size > MAX_IMAGE_SIZE) { onToast('Картинка больше 20 МБ'); return; }
         setDraftFile(file);
         // Временный адрес файла внутри браузера: чтобы показать картинку до отправки на сервер
         setDraftImg({ src: URL.createObjectURL(file) });

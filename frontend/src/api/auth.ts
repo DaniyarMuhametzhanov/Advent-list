@@ -1,11 +1,12 @@
 // Запросы про вход: кто я, войти, зарегистрироваться, выйти.
 import { HttpError, request } from './http';
 
-// Это MeResponse из Java
+// Кто я (worker/src/routes/auth.ts)
 export type Me = {
     id: number;
     name: string;
     email: string;
+    role: 'USER' | 'ADMIN'; // обычный пользователь или администратор
 };
 
 export type LoginInput = { email: string; password: string };
@@ -38,4 +39,4 @@ export function register(input: RegisterInput) {
 
 export function logout() {
     return request<void>('/api/auth/logout', { method: 'POST' });
-}
+}

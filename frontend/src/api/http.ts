@@ -10,12 +10,6 @@ export class HttpError extends Error {
     }
 }
 
-// Достать значение cookie по имени. document.cookie выглядит так: "a=1; XSRF-TOKEN=abc"
-function readCookie(name: string): string | undefined {
-    const pair = document.cookie.split('; ').find(c => c.startsWith(name + '='));
-    return pair ? decodeURIComponent(pair.slice(name.length + 1)) : undefined;
-}
-
 // Отправить запрос, проверить ответ, достать JSON.
 export async function request<T>(url: string, init?: RequestInit): Promise<T> {
     // Файл (FormData) отправляем без своего Content-Type: браузер сам поставит
@@ -23,15 +17,13 @@ export async function request<T>(url: string, init?: RequestInit): Promise<T> {
     const isForm = init?.body instanceof FormData;
     const headers: Record<string, string> = isForm ? {} : { 'Content-Type': 'application/json' };
 
-    // Защита от CSRF: сервер положил токен в cookie XSRF-TOKEN,
-    // а мы возвращаем его в заголовке. Чужой сайт этот cookie прочитать не может.
-    const token = readCookie('XSRF-TOKEN');
-    if (token) headers['X-XSRF-TOKEN'] = token;
+    // Cookie сессии браузер отправляет сам. Защита от CSRF теперь на сервере: он проверяет заголовок Origin
+    // (с какого сайта запрос), а его браузер ставит сам, и подделать его страница не может
 
     const response = await fetch(url, { ...init, headers });
 
     if (!response.ok) {
-        // Наш GlobalExceptionHandler отвечает в формате ProblemDetail: { detail, errors? }
+        // Сервер отвечает в формате ProblemDetail (как GlobalExceptionHandler в Java): { detail, errors? }
         const problem = await response.json().catch(() => null);
         const fieldError = problem?.errors && Object.values(problem.errors)[0];
         throw new HttpError(fieldError ?? problem?.detail ?? `Ошибка сервера: ${response.status}`, response.status);

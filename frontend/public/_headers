@@ -1,0 +1,9 @@
+# Защитные заголовки для страниц фронтенда. Cloudflare читает этот файл сам (как раньше nginx — security-headers.conf).
+# CSP: скрипты и запросы — только с нашего адреса. Стили и шрифты — ещё с Google Fonts (index.html).
+# Картинки — ещё из data: и blob: (так браузер показывает выбранный файл до загрузки). В рамку нас не вставить
+/*
+  Content-Security-Policy: default-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: no-referrer
+  Permissions-Policy: camera=(), microphone=(), geolocation=()

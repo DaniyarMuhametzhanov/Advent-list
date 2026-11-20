@@ -1,0 +1,26 @@
+{
+  "name": "advent-worker",
+  "description": "Бэкенд адвент-календаря на Cloudflare Workers (этап 15)",
+  "scripts": {
+    "dev": "wrangler dev",
+    "build:frontend": "npm --prefix ../frontend ci && npm --prefix ../frontend run build",
+    "deploy": "npm run build:frontend && wrangler d1 migrations apply advent --remote && wrangler deploy",
+    "db:migrate:local": "wrangler d1 migrations apply advent --local",
+    "typecheck": "tsc",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "hono": "^4.13.14"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20261030.1",
+    "@types/node": "^24.19.2",
+    "esbuild": "^0.28.2",
+    "miniflare": "^4.20260730.0",
+    "typescript": "~6.0.2",
+    "vitest": "^4.1.12",
+    "wrangler": "^4.156.0"
+  },
+  "private": true,
+  "type": "module"
+}

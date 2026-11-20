@@ -260,7 +260,7 @@ export default function App() {
 
   return (
       <>
-        <Header me={me} badge={badge} friendsOpen={friendsOpen} onLogout={logout}
+        <Header me={me} badge={badge} friendsOpen={friendsOpen} onLogout={logout} isAdmin={user.role === 'ADMIN'}
                 onFriendsClick={() => setFriendsOpen(true)} />
 
         <main className="wrap">

@@ -1,0 +1,5 @@
+# Настройки для локального запуска (npm run dev). Скопируйте этот файл в .dev.vars
+# (copy .dev.vars.example .dev.vars) — .dev.vars в git не попадает.
+
+# Администратор для локального запуска. Зарегистрируйтесь с этим email, и вам откроется страница «Доступ»
+ADMIN_EMAILS=admin@example.com

@@ -25,6 +25,7 @@ export function RegisterPage() {
     return (
         <main className="auth card">
             <h1>Регистрация</h1>
+            <p className="hint">Регистрация по приглашению: подойдёт только email, который добавил администратор.</p>
             <form onSubmit={submit}>
     <label className="lbl">Имя
         <input className="field" autoComplete="name" required maxLength={100}
@@ -61,4 +62,4 @@ export function RegisterPage() {
     <p className="hint">Уже есть аккаунт? <Link to="/login">Войти</Link></p>
         </main>
     );
-    }
+    }

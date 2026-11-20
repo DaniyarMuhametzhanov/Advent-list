@@ -10,6 +10,7 @@ import { RequireAuth } from './components/RequireAuth.tsx'
 import { PrivacyPage } from './pages/PrivacyPage.tsx'
 import { TermsPage } from './pages/TermsPage.tsx'
 import { Footer } from './components/Footer.tsx'
+import { AdminPage } from './pages/AdminPage.tsx'
 
 // Хранилище ответов сервера для всего приложения
 const queryClient = new QueryClient()
@@ -24,6 +25,7 @@ createRoot(document.getElementById('root')!).render(
                     <Route path="/privacy" element={<PrivacyPage />} />
                     <Route path="/terms" element={<TermsPage />} />
                     <Route path="/" element={<RequireAuth><App /></RequireAuth>} />
+                    <Route path="/admin" element={<RequireAuth><AdminPage /></RequireAuth>} />
                     <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
                 <Footer />
