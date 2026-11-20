@@ -1,4 +1,4 @@
-// Картинки желаний в хранилище R2.
+// Картинки желаний (хранятся в базе D1, таблица images).
 //   POST /api/wishes/:id/image  — загрузить картинку к своему желанию (форма с файлами full и thumb)
 //   GET  /api/wishes/:id/image?size=thumb&v=... — сама картинка (владельцу или другу с открытым днём)
 //
@@ -7,12 +7,13 @@
 // большую (до 1600 точек) и превью (до 300 точек). Сервер проверяет, что это правда JPEG и не слишком большой
 import { Hono } from 'hono';
 import type { App } from '../env';
-import { deleteImageFiles, fileName } from '../lib/imageFiles';
+import { deleteImageFiles, readImageFile, saveImageFiles } from '../lib/imageFiles';
 import { ApiError, badRequest, notFound } from '../errors';
 import { idParam } from '../lib/validate';
 import { findMyWish, myWishResponse } from './wishes';
 
-export const MAX_FULL_BYTES = 2 * 1024 * 1024; // 2 МБ — уменьшенной до 1600 точек картинке этого хватает
+// 1,5 МБ — уменьшенной до 1600 точек картинке этого хватает. Больше нельзя: в D1 одно значение не больше 2 млн байт
+export const MAX_FULL_BYTES = 1.5 * 1024 * 1024;
 export const MAX_THUMB_BYTES = 300 * 1024;     // 300 КБ
 
 export const imageRoutes = new Hono<App>();
@@ -44,11 +45,7 @@ imageRoutes.post('/wishes/:id{[0-9]+}/image', async c => {
     const thumb = await jpegBytes(form.get('thumb'), MAX_THUMB_BYTES, 'Превью');
 
     const newKey = crypto.randomUUID(); // случайное имя: его нельзя угадать
-    const meta = { httpMetadata: { contentType: 'image/jpeg' } };
-    await Promise.all([
-        c.env.IMAGES.put(fileName(newKey, 'full'), full, meta),
-        c.env.IMAGES.put(fileName(newKey, 'thumb'), thumb, meta),
-    ]);
+    await saveImageFiles(c.env, newKey, full, thumb);
     await c.env.DB.prepare('UPDATE wishes SET image_key = ? WHERE id = ?').bind(newKey, wish.id).run();
     if (wish.imageKey) await deleteImageFiles(c.env, wish.imageKey); // старая картинка больше не нужна
 
@@ -69,9 +66,9 @@ imageRoutes.get('/wishes/:id{[0-9]+}/image', async c => {
         throw notFound(`Желание с id ${id} не найдено`);
     }
 
-    const file = await c.env.IMAGES.get(fileName(wish.imageKey, c.req.query('size') === 'thumb' ? 'thumb' : 'full'));
+    const file = await readImageFile(c.env, wish.imageKey, c.req.query('size') === 'thumb' ? 'thumb' : 'full');
     if (!file) throw notFound(`Желание с id ${id} не найдено`);
-    return c.body(file.body, 200, {
+    return c.body(file, 200, {
         'Content-Type': 'image/jpeg',
         // Браузер может 10 минут держать картинку у себя, но только для этого человека (private).
         // Адрес меняется вместе с картинкой (v=...), поэтому старую он не покажет

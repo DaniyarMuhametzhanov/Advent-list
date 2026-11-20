@@ -2,7 +2,6 @@
 // Имена совпадают с wrangler.jsonc
 export type Env = {
     DB: D1Database;        // база D1
-    IMAGES: R2Bucket;      // хранилище картинок R2
     ASSETS: Fetcher;       // собранный фронтенд
 
     ADMIN_EMAILS?: string;  // первые администраторы: email через запятую. Решают, кому можно регистрироваться

@@ -85,7 +85,7 @@ wishRoutes.put('/wishes/:date', async c => {
 });
 
 // Доступы и запросы доступа к желанию удалит сама база (ON DELETE CASCADE).
-// А файлы картинки в R2 база не видит — их удаляем сами
+// А картинки лежат в отдельной таблице images без связи с желанием — их удаляем сами
 wishRoutes.delete('/wishes/:id{[0-9]+}', async c => {
     const me = c.get('me').id;
     const wish = await findMyWish(c.env.DB, me, idParam(c, 'id'));
