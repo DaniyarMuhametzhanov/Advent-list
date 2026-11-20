@@ -35,6 +35,9 @@
   // Обычные (не секретные) настройки. Секреты (BOT_TOKEN, WEBHOOK_SECRET) сюда НЕ пишем:
   // они задаются командой `npx wrangler secret put ...`
   "vars": {
+    // Администраторы: их Telegram id через запятую, например "123456789". Только они решают,
+    // кому открыть календарь (бот присылает им заявки). Свой id можно узнать командой /id у нашего бота
+    "ADMIN_TELEGRAM_IDS": "",
     // Версии юридических документов. Должны совпадать с PRIVACY_VERSION и TERMS_VERSION во frontend/src/legal
     "PRIVACY_VERSION": "0.1-draft",
     "TERMS_VERSION": "0.1-draft"

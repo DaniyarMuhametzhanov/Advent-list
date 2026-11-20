@@ -8,6 +8,7 @@ import { createMiddleware } from 'hono/factory';
 import type { App, CurrentUser, TelegramUser } from '../env';
 import { ApiError } from '../errors';
 import { verifyInitData } from './telegram';
+import { accessStatus } from '../lib/userAccess';
 
 // 1. Кто пришёл? Проверяем подпись Telegram. Нет или неверная → 401
 export const telegramAuth = createMiddleware<App>(async (c, next) => {
@@ -48,9 +49,13 @@ export async function syncProfile(db: D1Database, me: CurrentUser, tg: TelegramU
     return { ...me, name, username };
 }
 
-// 2. Есть ли он у нас? Пока не принял условия (не зарегистрировался) — 403
+// Текст для того, кому администратор (ещё) не открыл доступ
+export const NO_ACCESS = 'Доступ к календарю открывает администратор';
+
+// 2. Есть ли он у нас? Администратор не разрешил (или закрыл доступ) — 403. Не принял условия — тоже 403
 export const requireUser = createMiddleware<App>(async (c, next) => {
     const tg = c.get('telegramUser');
+    if (await accessStatus(c.env, tg.id) !== 'ALLOWED') throw new ApiError(403, NO_ACCESS);
     const me = await findByTelegramId(c.env.DB, tg.id);
     if (!me) throw new ApiError(403, 'Сначала примите условия использования');
     c.set('me', await syncProfile(c.env.DB, me, tg));

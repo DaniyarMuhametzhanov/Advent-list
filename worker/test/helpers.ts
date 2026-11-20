@@ -1,12 +1,13 @@
 // Запуск нашего Worker для тестов: настоящий движок Cloudflare (workerd) на своём компьютере
 // через Miniflare. База D1 и хранилище R2 — временные, в памяти
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { build } from 'esbuild';
 import { Miniflare } from 'miniflare';
 import { signInitData } from '../src/auth/telegram';
 
 export const BOT_TOKEN = '123456:test-token';
 export const WEBHOOK_SECRET = 'test-webhook-secret';
+export const ADMIN_ID = 1;
 
 // Сообщения, которые бот «отправил» в Telegram. Настоящий api.telegram.org в тестах не вызываем
 export const sentMessages: { chat_id: number; text: string; reply_markup?: unknown }[] = [];
@@ -21,17 +22,19 @@ export async function startWorker() {
         compatibilityDate: '2026-07-01',
         d1Databases: ['DB'],
         r2Buckets: ['IMAGES'],
-        bindings: { BOT_TOKEN, WEBHOOK_SECRET, PRIVACY_VERSION: 'p-1', TERMS_VERSION: 't-1' },
+        bindings: { BOT_TOKEN, WEBHOOK_SECRET, ADMIN_TELEGRAM_IDS: String(ADMIN_ID), PRIVACY_VERSION: 'p-1', TERMS_VERSION: 't-1' },
         // Все запросы Worker наружу (fetch) попадают сюда
         outboundService: async (request: Request) => {
             if (request.url.includes('api.telegram.org')) sentMessages.push(await request.json());
             return new Response('{"ok":true}');
         },
     });
-    // Создать таблицы: выполнить миграцию по одной команде
+    // Создать таблицы: выполнить все миграции по порядку, по одной команде
     const db = await mf.getD1Database('DB');
-    const sql = readFileSync('migrations/0001_init.sql', 'utf8').replace(/--.*$/gm, '');
-    await db.batch(sql.split(';').map((s: string) => s.trim()).filter(Boolean).map((s: string) => db.prepare(s)));
+    for (const file of readdirSync('migrations').sort()) {
+        const sql = readFileSync(`migrations/${file}`, 'utf8').replace(/--.*$/gm, '');
+        await db.batch(sql.split(';').map((s: string) => s.trim()).filter(Boolean).map((s: string) => db.prepare(s)));
+    }
     return mf;
 }
 

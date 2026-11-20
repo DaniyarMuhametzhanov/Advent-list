@@ -7,17 +7,21 @@ export function openAppButton(appUrl: string, text = '🎁 Открыть кал
     return { inline_keyboard: [[{ text, web_app: { url: appUrl } }]] };
 }
 
-// Не получилось отправить (человек заблокировал бота, нет связи) — это не повод ломать запрос:
-// только пишем в журнал
-export async function sendMessage(env: Env, chatId: number, text: string, replyMarkup?: unknown) {
+// Вызвать любой метод Bot API: sendMessage, editMessageText, answerCallbackQuery...
+// Не получилось (человек заблокировал бота, нет связи) — это не повод ломать запрос: только пишем в журнал
+export async function callTelegram(env: Env, method: string, payload: Record<string, unknown>) {
     try {
-        const response = await fetch(`https://api.telegram.org/bot${env.BOT_TOKEN}/sendMessage`, {
+        const response = await fetch(`https://api.telegram.org/bot${env.BOT_TOKEN}/${method}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ chat_id: chatId, text, reply_markup: replyMarkup }),
+            body: JSON.stringify(payload),
         });
-        if (!response.ok) console.warn('Telegram sendMessage:', response.status, await response.text());
+        if (!response.ok) console.warn(`Telegram ${method}:`, response.status, await response.text());
     } catch (e) {
-        console.warn('Telegram sendMessage:', e);
+        console.warn(`Telegram ${method}:`, e);
     }
+}
+
+export function sendMessage(env: Env, chatId: number, text: string, replyMarkup?: unknown) {
+    return callTelegram(env, 'sendMessage', { chat_id: chatId, text, reply_markup: replyMarkup });
 }

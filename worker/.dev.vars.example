@@ -5,5 +5,9 @@
 BOT_TOKEN=123456:local-test-token
 WEBHOOK_SECRET=local-webhook-secret
 
+# Администратор для локального запуска: http://localhost:5173/?as=1000:Админ.
+# Открыть доступ другим можно так же, как в Telegram: команда боту /allow <id> (см. docs/stage-15.md)
+ADMIN_TELEGRAM_IDS=1000
+
 # Вход без Telegram: http://localhost:5173/?as=1001:Анна. ТОЛЬКО для своего компьютера!
 DEV_AUTH=1

@@ -2,7 +2,7 @@
 // Как Java-тесты SecurityRulesTest, AccessRulesTest, ImageRulesTest и HolidayRulesTest
 import type { Miniflare } from 'miniflare';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { WEBHOOK_SECRET, sentMessages, startWorker, tg } from './helpers';
+import { ADMIN_ID, WEBHOOK_SECRET, sentMessages, startWorker, tg } from './helpers';
 
 let mf: Miniflare;
 let telegramId = 1000;
@@ -31,9 +31,17 @@ async function call(auth: string | null, method: string, path: string, body?: un
     return { status: response.status, body: json, text };
 }
 
-// Новый человек: пришёл из Telegram и принял условия
+// Администратор открыл доступ человеку (прямо в базе: так короче)
+async function allow(tid: number) {
+    const db = await mf.getD1Database('DB');
+    await db.prepare(`INSERT OR REPLACE INTO user_access (telegram_id, name, status, requested_at) VALUES (?, 'x', 'ALLOWED', '')`)
+        .bind(tid).run();
+}
+
+// Новый человек: администратор открыл ему доступ, он пришёл из Telegram и принял условия
 async function newUser(name: string, username?: string) {
     const tid = ++telegramId;
+    await allow(tid);
     const auth = await tg(tid, name, username);
     const res = await call(auth, 'POST', '/api/auth/register', { privacyAccepted: true, termsAccepted: true });
     expect(res.status).toBe(201);
@@ -61,8 +69,10 @@ describe('Вход через Telegram', () => {
         expect((await call('dev 1:Hacker', 'GET', '/api/me')).status).toBe(401);
     });
 
-    it('новый человек: 404 на /me, без галочек не регистрируется, с галочками — да', async () => {
-        const auth = await tg(++telegramId, 'Новичок', 'newbie');
+    it('новый человек с доступом: 404 на /me, без галочек не регистрируется, с галочками — да', async () => {
+        const tid = ++telegramId;
+        await allow(tid);
+        const auth = await tg(tid, 'Новичок', 'newbie');
         expect((await call(auth, 'GET', '/api/me')).status).toBe(404);
         expect((await call(auth, 'GET', '/api/wishes')).status).toBe(403);
 
@@ -247,9 +257,82 @@ describe('Праздники', () => {
     });
 });
 
+// Отправить боту событие от Telegram (с правильным секретом)
+function webhook(update: unknown) {
+    return mf.dispatchFetch('https://advent.test/api/telegram/webhook', {
+        method: 'POST', body: JSON.stringify(update),
+        headers: { 'X-Telegram-Bot-Api-Secret-Token': WEBHOOK_SECRET },
+    });
+}
+
+const lastTo = (chatId: number) => sentMessages.filter(m => m.chat_id === chatId).at(-1);
+
+describe('Доступ по приглашению', () => {
+    it('без разрешения не войти и не зарегистрироваться; админ получает заявку один раз и открывает доступ кнопкой', async () => {
+        const tid = ++telegramId;
+        const auth = await tg(tid, 'Гость', 'guest');
+        sentMessages.length = 0;
+
+        const me = await call(auth, 'GET', '/api/me');
+        expect(me.status).toBe(403);
+        expect(me.body.detail).toContain('администратор');
+        expect((await call(auth, 'POST', '/api/auth/register', { privacyAccepted: true, termsAccepted: true })).status).toBe(403);
+        expect((await call(auth, 'GET', '/api/wishes')).status).toBe(403);
+
+        // Заявка пришла администратору с кнопками — и только один раз, сколько бы гость ни заходил
+        await expect.poll(() => lastTo(ADMIN_ID)?.reply_markup).toEqual({ inline_keyboard: [[
+            { text: '✅ Разрешить', callback_data: `allow:${tid}` }, { text: '❌ Отказать', callback_data: `deny:${tid}` }]] });
+        expect(lastTo(ADMIN_ID)?.text).toBe(`🙋 Гость (@guest, id ${tid}) просит доступ к календарю`);
+        await call(auth, 'GET', '/api/me');
+        expect(sentMessages.filter(m => m.chat_id === ADMIN_ID)).toHaveLength(1);
+
+        // Кнопку нажал не администратор — ничего не меняется
+        await webhook({ callback_query: { id: 'q0', from: { id: tid, first_name: 'Гость' }, data: `allow:${tid}` } });
+        expect((await call(auth, 'GET', '/api/me')).status).toBe(403);
+
+        // Администратор нажал «Разрешить»: гость получил сообщение и может зарегистрироваться
+        await webhook({ callback_query: { id: 'q1', from: { id: ADMIN_ID, first_name: 'Админ' }, data: `allow:${tid}`,
+            message: { chat: { id: ADMIN_ID }, message_id: 5, text: 'заявка' } } });
+        await expect.poll(() => lastTo(tid)?.text).toBe('✅ Администратор открыл вам адвент-календарь!');
+        expect((await call(auth, 'GET', '/api/me')).status).toBe(404);
+        expect((await call(auth, 'POST', '/api/auth/register', { privacyAccepted: true, termsAccepted: true })).status).toBe(201);
+        expect((await call(auth, 'GET', '/api/wishes')).status).toBe(200);
+
+        // Закрыл командой /deny — сразу всё закрыто, и в поиске человека больше нет
+        const friend = await newUser('Ищет Гостя');
+        expect((await call(friend.auth, 'GET', '/api/users/search?q=гость')).body).toHaveLength(1);
+        await webhook({ message: { chat: { id: ADMIN_ID }, from: { id: ADMIN_ID, first_name: 'Админ' }, text: `/deny ${tid}` } });
+        expect((await call(auth, 'GET', '/api/wishes')).status).toBe(403);
+        expect((await call(friend.auth, 'GET', '/api/users/search?q=гость')).body).toEqual([]);
+    });
+
+    it('администратору доступ открыт всегда, /allow работает заранее, /users показывает список', async () => {
+        const admin = await tg(ADMIN_ID, 'Админ');
+        expect((await call(admin, 'GET', '/api/me')).status).toBe(404); // доступ есть, осталось принять условия
+
+        const future = ++telegramId;
+        sentMessages.length = 0;
+        await webhook({ message: { chat: { id: ADMIN_ID }, from: { id: ADMIN_ID, first_name: 'Админ' }, text: `/allow ${future}` } });
+        await expect.poll(() => lastTo(ADMIN_ID)?.text).toBe(`✅ Доступ открыт: ${future}`);
+        expect((await call(await tg(future, 'Заранее'), 'GET', '/api/me')).status).toBe(404);
+
+        await webhook({ message: { chat: { id: ADMIN_ID }, from: { id: ADMIN_ID, first_name: 'Админ' }, text: '/users' } });
+        await expect.poll(() => lastTo(ADMIN_ID)?.text).toContain(`id ${future}`);
+    });
+
+    it('обычному человеку команды администратора не работают', async () => {
+        const tid = ++telegramId;
+        sentMessages.length = 0;
+        await webhook({ message: { chat: { id: tid }, from: { id: tid, first_name: 'Хитрый' }, text: `/allow ${tid}` } });
+        await expect.poll(() => lastTo(tid)?.text).toContain('по приглашению');
+        expect((await call(await tg(tid, 'Хитрый'), 'GET', '/api/me')).status).toBe(403);
+    });
+});
+
 describe('Бот', () => {
     it('без секрета webhook не принимает, с секретом отвечает кнопкой', async () => {
-        const update = { message: { chat: { id: 777 }, text: '/start' } };
+        const update = { message: { chat: { id: 777 }, from: { id: 777, first_name: 'Друг' }, text: '/start' } };
+        await allow(777);
         const res = await mf.dispatchFetch('https://advent.test/api/telegram/webhook',
             { method: 'POST', body: JSON.stringify(update) });
         expect(res.status).toBe(401);

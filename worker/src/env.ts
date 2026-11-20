@@ -7,6 +7,7 @@ export type Env = {
 
     BOT_TOKEN: string;      // секрет: токен бота от @BotFather
     WEBHOOK_SECRET: string; // секрет: пароль, которым Telegram подписывает запросы к /api/telegram/webhook
+    ADMIN_TELEGRAM_IDS?: string; // администраторы: Telegram id через запятую. Решают, кому открыть доступ
     PRIVACY_VERSION: string;
     TERMS_VERSION: string;
 

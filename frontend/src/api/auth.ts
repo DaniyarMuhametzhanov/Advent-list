@@ -13,7 +13,8 @@ export type RegisterInput = {
     termsAccepted: boolean;   // Условия использования + 18 лет
 };
 
-// Кто я? Если человек из Telegram ещё не создал аккаунт, сервер ответит 404 — тогда null
+// Кто я? Если человек из Telegram ещё не создал аккаунт, сервер ответит 404 — тогда null.
+// 403 — администратор ещё не открыл доступ: эту ошибку покажет RequireAuth
 export async function fetchMe(): Promise<Me | null> {
     try {
         return await request<Me>('/api/me');

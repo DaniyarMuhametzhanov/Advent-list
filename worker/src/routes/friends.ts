@@ -11,6 +11,7 @@ import { badRequest, conflict, notFound } from '../errors';
 import { idParam, jsonBody, now } from '../lib/validate';
 import { areFriends, pair } from '../lib/friendship';
 import { notify, telegramIdOf } from '../lib/notify';
+import { adminIds } from '../lib/userAccess';
 
 export const friendRoutes = new Hono<App>();
 
@@ -50,8 +51,12 @@ friendRoutes.get('/users/search', async c => {
                 END AS relation
          FROM users u
          WHERE u.id <> ?1 AND (u.name_lower LIKE ?2 ESCAPE '\\' OR lower(u.username) = ?3)
+           -- Только те, у кого есть доступ: закрытых администратором в поиске не показываем
+           AND (EXISTS (SELECT 1 FROM user_access a WHERE a.telegram_id = u.telegram_id AND a.status = 'ALLOWED')
+                OR u.telegram_id IN (SELECT value FROM json_each(?4)))
          ORDER BY u.name LIMIT 20`)
-        .bind(me, pattern, username).all<Person & { relation: string }>();
+        // ?4 — администраторы списком JSON: им доступ открыт всегда
+        .bind(me, pattern, username, JSON.stringify(adminIds(c.env))).all<Person & { relation: string }>();
     return c.json(results);
 });
 

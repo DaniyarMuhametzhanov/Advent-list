@@ -19,8 +19,21 @@ const devAuth = (telegramId: number, name: string) => `dev ${telegramId}:${encod
 const ANNA_TG = Date.now() % 1_000_000_000;
 const BORIS_TG = ANNA_TG + 1;
 
+// Администратор открывает человеку доступ командой боту /allow — как в Telegram.
+// Сообщение «от Telegram» подписано секретом webhook и администратором 1000 из worker/.dev.vars
+async function allow(browser: Browser, telegramId: number) {
+    const context = await browser.newContext();
+    const response = await context.request.post('/api/telegram/webhook', {
+        headers: { 'X-Telegram-Bot-Api-Secret-Token': 'local-webhook-secret' },
+        data: { message: { chat: { id: 1000 }, from: { id: 1000, first_name: 'Админ' }, text: `/allow ${telegramId}` } },
+    });
+    expect(response.ok()).toBe(true);
+    await context.close();
+}
+
 // Свой браузер (контекст) для каждого человека
 async function register(browser: Browser, name: string, telegramId: number): Promise<Page> {
+    await allow(browser, telegramId);
     const page = await (await browser.newContext()).newPage();
     await page.goto(`/?as=${telegramId}:${encodeURIComponent(name)}`); // «открыли из Telegram» впервые
     await expect(page.getByRole('heading', { name: 'Добро пожаловать!' })).toBeVisible();
