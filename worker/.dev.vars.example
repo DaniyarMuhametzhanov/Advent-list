@@ -1,13 +1,5 @@
-# Секреты для локального запуска (npm run dev). Скопируйте этот файл в .dev.vars
-# (cp .dev.vars.example .dev.vars) — .dev.vars в git не попадает.
+# Настройки для локального запуска (npm run dev). Скопируйте этот файл в .dev.vars
+# (copy .dev.vars.example .dev.vars) — .dev.vars в git не попадает.
 
-# Токен бота. Для локального запуска подойдёт любой текст, настоящий нужен только в Cloudflare
-BOT_TOKEN=123456:local-test-token
-WEBHOOK_SECRET=local-webhook-secret
-
-# Администратор для локального запуска: http://localhost:5173/?as=1000:Админ.
-# Открыть доступ другим можно так же, как в Telegram: команда боту /allow <id> (см. docs/stage-15.md)
-ADMIN_TELEGRAM_IDS=1000
-
-# Вход без Telegram: http://localhost:5173/?as=1001:Анна. ТОЛЬКО для своего компьютера!
-DEV_AUTH=1
+# Администратор для локального запуска. Зарегистрируйтесь с этим email, и вам откроется страница «Доступ»
+ADMIN_EMAILS=admin@example.com

@@ -1,6 +1,6 @@
 // Картинки желаний в хранилище R2.
 //   POST /api/wishes/:id/image  — загрузить картинку к своему желанию (форма с файлами full и thumb)
-//   GET  /api/wishes/:id/image?size=thumb&v=...&exp=...&sig=... — сама картинка (по подписанному адресу)
+//   GET  /api/wishes/:id/image?size=thumb&v=... — сама картинка (владельцу или другу с открытым днём)
 //
 // В Java-версии сервер сам уменьшал картинку. В бесплатных Workers нет библиотек для этого,
 // поэтому уменьшает браузер (frontend/src/lib/resizeImage.ts) и присылает сразу две готовые JPEG:
@@ -10,16 +10,12 @@ import type { App } from '../env';
 import { deleteImageFiles, fileName } from '../lib/imageFiles';
 import { ApiError, badRequest, notFound } from '../errors';
 import { idParam } from '../lib/validate';
-import { verifyImageUrl } from '../lib/imageUrls';
 import { findMyWish, myWishResponse } from './wishes';
 
 export const MAX_FULL_BYTES = 2 * 1024 * 1024; // 2 МБ — уменьшенной до 1600 точек картинке этого хватает
 export const MAX_THUMB_BYTES = 300 * 1024;     // 300 КБ
 
-// Загрузка — только для вошедших, а смотреть можно по подписанному адресу без входа.
-// Поэтому два набора адресов: index.ts подключает их по-разному
 export const imageRoutes = new Hono<App>();
-export const imagePublicRoutes = new Hono<App>();
 
 // Настоящий ли это JPEG? У любого JPEG первые три байта FF D8 FF («магические байты»).
 // Расширению и типу из запроса не верим: их легко подписать как угодно
@@ -59,32 +55,26 @@ imageRoutes.post('/wishes/:id{[0-9]+}/image', async c => {
     return c.json(await myWishResponse(c.env, me, wish.id)); // желание уже с адресами новой картинки
 });
 
-// Здесь нет telegramAuth: тег <img> не умеет присылать заголовок Authorization.
-// Вместо этого проверяем подпись в адресе (см. lib/imageUrls.ts)
-imagePublicRoutes.get('/wishes/:id{[0-9]+}/image', async c => {
+// Отдать картинку. Главное правило: только владельцу или другу, которому открыт день.
+// Тег <img> сам отправляет cookie сессии, поэтому requireUser знает, кто смотрит
+imageRoutes.get('/wishes/:id{[0-9]+}/image', async c => {
     const id = idParam(c, 'id');
-    const { size, v, u, exp, sig } = c.req.query();
-    const viewer = Number(u);
-    // Нет доступа — отвечаем 404, как будто картинки нет вовсе. Не подсказываем, что она существует
-    if (!v || !sig || !Number.isInteger(viewer) || !await verifyImageUrl(c.env, id, v, viewer, Number(exp), sig)) {
-        throw notFound(`Желание с id ${id} не найдено`);
-    }
-    // Подпись верна. Но с тех пор могло что-то измениться: картинку заменили или владелец закрыл день.
-    // Главное правило: картинку видит только владелец или друг, которому открыт день
+    const viewer = c.get('me').id;
     const wish = await c.env.DB.prepare(
         `SELECT image_key AS imageKey, owner_id AS ownerId,
                 EXISTS (SELECT 1 FROM wish_access a WHERE a.wish_id = w.id AND a.viewer_id = ?) AS isOpen
          FROM wishes w WHERE id = ?`).bind(viewer, id).first<{ imageKey: string | null; ownerId: number; isOpen: number }>();
-    if (!wish || wish.imageKey !== v || (wish.ownerId !== viewer && wish.isOpen !== 1)) {
+    // Нет доступа — отвечаем 404, как будто картинки нет вовсе. Не подсказываем, что она существует
+    if (!wish?.imageKey || (wish.ownerId !== viewer && wish.isOpen !== 1)) {
         throw notFound(`Желание с id ${id} не найдено`);
     }
 
-    const file = await c.env.IMAGES.get(fileName(v, size === 'thumb' ? 'thumb' : 'full'));
+    const file = await c.env.IMAGES.get(fileName(wish.imageKey, c.req.query('size') === 'thumb' ? 'thumb' : 'full'));
     if (!file) throw notFound(`Желание с id ${id} не найдено`);
     return c.body(file.body, 200, {
         'Content-Type': 'image/jpeg',
-        // Браузер может держать картинку у себя, но только для этого человека (private).
+        // Браузер может 10 минут держать картинку у себя, но только для этого человека (private).
         // Адрес меняется вместе с картинкой (v=...), поэтому старую он не покажет
-        'Cache-Control': 'private, max-age=86400',
+        'Cache-Control': 'private, max-age=600',
     });
 });

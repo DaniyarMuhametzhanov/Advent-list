@@ -20,9 +20,9 @@ type WishRow = { id: number; date: string; title: string; comment: string | null
 const WISH_COLUMNS = 'id, wish_date AS date, title, comment, image_key AS imageKey';
 
 // Желание для владельца (как WishResponse в Java): с адресами картинок и списком «кому открыт»
-async function wishResponse(env: Env, me: number, wish: WishRow, access: number[]) {
+function wishResponse(wish: WishRow, access: number[]) {
     return { id: wish.id, date: wish.date, title: wish.title, comment: wish.comment, access,
-        ...await imageUrls(env, wish, me) };
+        ...imageUrls(wish) };
 }
 
 // id друзей, которым открыто это желание
@@ -42,7 +42,7 @@ export async function findMyWish(db: D1Database, me: number, id: number) {
 // Моё желание целиком: для ответа после сохранения или загрузки картинки
 export async function myWishResponse(env: Env, me: number, id: number) {
     const wish = await findMyWish(env.DB, me, id);
-    return wishResponse(env, me, wish, await accessOf(env.DB, id));
+    return wishResponse(wish, await accessOf(env.DB, id));
 }
 
 wishRoutes.get('/wishes', async c => {
@@ -59,8 +59,7 @@ wishRoutes.get('/wishes', async c => {
     for (const row of access.results as { wishId: number; viewerId: number }[]) {
         byWish.set(row.wishId, [...(byWish.get(row.wishId) ?? []), row.viewerId]);
     }
-    return c.json(await Promise.all((wishes.results as WishRow[])
-        .map(wish => wishResponse(c.env, me, wish, byWish.get(wish.id) ?? []))));
+    return c.json((wishes.results as WishRow[]).map(wish => wishResponse(wish, byWish.get(wish.id) ?? [])));
 });
 
 wishRoutes.get('/wishes/:id{[0-9]+}', async c => {
@@ -122,7 +121,7 @@ wishRoutes.get('/calendars/:userId{[0-9]+}', async c => {
     const holidaysByDay = new Map<number, string[]>();
     for (const h of holidays.results) holidaysByDay.set(h.day, [...(holidaysByDay.get(h.day) ?? []), h.title]);
 
-    return c.json(await Promise.all(results.map(async wish => {
+    return c.json(results.map(wish => {
         const open = isOwner || wish.isOpen === 1;
         // Главное правило: у закрытого дня название, комментарий, картинка и праздники даже не попадают в ответ
         if (!open) {
@@ -130,7 +129,7 @@ wishRoutes.get('/calendars/:userId{[0-9]+}', async c => {
                 title: null, comment: null, imageUrl: null, thumbUrl: null, holidays: [] };
         }
         return { wishId: wish.id, date: wish.date, open: true, requested: false, title: wish.title,
-            comment: wish.comment, ...await imageUrls(c.env, wish, viewer),
+            comment: wish.comment, ...imageUrls(wish),
             holidays: holidaysByDay.get(Number(wish.date.slice(8))) ?? [] };
-    })));
+    }));
 });

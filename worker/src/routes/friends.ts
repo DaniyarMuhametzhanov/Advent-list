@@ -1,5 +1,5 @@
 // Друзья и заявки в друзья.
-//   GET    /api/users/search?q=Анна        — найти людей по имени или @нику
+//   GET    /api/users/search?q=Анна        — найти людей по имени
 //   GET    /api/friends                    — мои друзья
 //   DELETE /api/friends/:userId            — удалить из друзей
 //   POST   /api/friend-requests {toUserId} — отправить заявку
@@ -10,8 +10,6 @@ import type { App } from '../env';
 import { badRequest, conflict, notFound } from '../errors';
 import { idParam, jsonBody, now } from '../lib/validate';
 import { areFriends, pair } from '../lib/friendship';
-import { notify, telegramIdOf } from '../lib/notify';
-import { adminIds } from '../lib/userAccess';
 
 export const friendRoutes = new Hono<App>();
 
@@ -37,7 +35,6 @@ friendRoutes.get('/users/search', async c => {
     // по name_lower (имя заранее переведено в маленькие буквы). Знаки % и _ в запросе экранируем,
     // иначе «%» нашёл бы всех
     const pattern = `%${text.replace(/[\\%_]/g, ch => '\\' + ch)}%`;
-    const username = text.replace(/^@/, '');
     const { results } = await c.env.DB.prepare(
         `SELECT u.id, u.name,
                 CASE
@@ -50,13 +47,11 @@ friendRoutes.get('/users/search', async c => {
                   ELSE 'NONE'
                 END AS relation
          FROM users u
-         WHERE u.id <> ?1 AND (u.name_lower LIKE ?2 ESCAPE '\\' OR lower(u.username) = ?3)
-           -- Только те, у кого есть доступ: закрытых администратором в поиске не показываем
-           AND (EXISTS (SELECT 1 FROM user_access a WHERE a.telegram_id = u.telegram_id AND a.status = 'ALLOWED')
-                OR u.telegram_id IN (SELECT value FROM json_each(?4)))
+         WHERE u.id <> ?1 AND u.name_lower LIKE ?2 ESCAPE '\\'
+           -- Только те, у кого есть доступ: заблокированных администратором в поиске не показываем
+           AND (u.role = 'ADMIN' OR EXISTS (SELECT 1 FROM allowed_emails e WHERE e.email = u.email))
          ORDER BY u.name LIMIT 20`)
-        // ?4 — администраторы списком JSON: им доступ открыт всегда
-        .bind(me, pattern, username, JSON.stringify(adminIds(c.env))).all<Person & { relation: string }>();
+        .bind(me, pattern).all<Person & { relation: string }>();
     return c.json(results);
 });
 
@@ -90,8 +85,9 @@ friendRoutes.post('/friend-requests', async c => {
     }
     if (to === me.id) throw conflict('Нельзя добавить в друзья самого себя');
     const db = c.env.DB;
-    const toTelegramId = await telegramIdOf(db, to);
-    if (toTelegramId === null) throw notFound(`Пользователь с id ${to} не найден`);
+    if (!await db.prepare('SELECT 1 AS ok FROM users WHERE id = ?').bind(to).first('ok')) {
+        throw notFound(`Пользователь с id ${to} не найден`);
+    }
     if (await areFriends(db, me.id, to)) throw conflict('Вы уже друзья');
 
     const pending = (from: number, toUser: number) => db.prepare(
@@ -102,7 +98,6 @@ friendRoutes.post('/friend-requests', async c => {
 
     await db.prepare(`INSERT INTO friend_requests (from_user_id, to_user_id, status, created_at) VALUES (?, ?, 'PENDING', ?)`)
         .bind(me.id, to, now()).run();
-    notify(c, toTelegramId, `👋 ${me.name} хочет добавить вас в друзья в адвент-календаре`);
     return c.body(null, 201);
 });
 
@@ -133,8 +128,6 @@ friendRoutes.post('/friend-requests/:id{[0-9]+}/accept', async c => {
         // OR IGNORE: если дружба уже есть, ничего не делать
         db.prepare('INSERT OR IGNORE INTO friendships (user_a_id, user_b_id, created_at) VALUES (?, ?, ?)').bind(a, b, now()),
     ]);
-    const fromTelegramId = await telegramIdOf(db, request.fromId);
-    if (fromTelegramId !== null) notify(c, fromTelegramId, `🤝 ${me.name} принял(а) вашу заявку в друзья`);
     return c.body(null, 204);
 });
 

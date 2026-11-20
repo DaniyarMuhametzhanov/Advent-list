@@ -3,14 +3,8 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { build } from 'esbuild';
 import { Miniflare } from 'miniflare';
-import { signInitData } from '../src/auth/telegram';
 
-export const BOT_TOKEN = '123456:test-token';
-export const WEBHOOK_SECRET = 'test-webhook-secret';
-export const ADMIN_ID = 1;
-
-// Сообщения, которые бот «отправил» в Telegram. Настоящий api.telegram.org в тестах не вызываем
-export const sentMessages: { chat_id: number; text: string; reply_markup?: unknown }[] = [];
+export const ADMIN_EMAIL = 'admin@test.ru';
 
 export async function startWorker() {
     // Собрать src/index.ts в один файл JavaScript (как это делает wrangler)
@@ -22,12 +16,7 @@ export async function startWorker() {
         compatibilityDate: '2026-07-01',
         d1Databases: ['DB'],
         r2Buckets: ['IMAGES'],
-        bindings: { BOT_TOKEN, WEBHOOK_SECRET, ADMIN_TELEGRAM_IDS: String(ADMIN_ID), PRIVACY_VERSION: 'p-1', TERMS_VERSION: 't-1' },
-        // Все запросы Worker наружу (fetch) попадают сюда
-        outboundService: async (request: Request) => {
-            if (request.url.includes('api.telegram.org')) sentMessages.push(await request.json());
-            return new Response('{"ok":true}');
-        },
+        bindings: { ADMIN_EMAILS: ADMIN_EMAIL, PRIVACY_VERSION: 'p-1', TERMS_VERSION: 't-1' },
     });
     // Создать таблицы: выполнить все миграции по порядку, по одной команде
     const db = await mf.getD1Database('DB');
@@ -36,10 +25,4 @@ export async function startWorker() {
         await db.batch(sql.split(';').map((s: string) => s.trim()).filter(Boolean).map((s: string) => db.prepare(s)));
     }
     return mf;
-}
-
-// «Человек из Telegram»: заголовок Authorization с настоящей подписью
-export async function tg(id: number, firstName: string, username?: string) {
-    const user = JSON.stringify({ id, first_name: firstName, ...(username && { username }) });
-    return 'tma ' + await signInitData({ user, auth_date: String(Math.floor(Date.now() / 1000)) }, BOT_TOKEN);
 }

@@ -1,7 +1,7 @@
 import { expect, test, type Browser, type Page } from '@playwright/test';
 
 // «Сценарий показа» из макета, но с двумя настоящими людьми в двух разных браузерах.
-// Каждый запуск создаёт новых пользователей (с новыми «Telegram id»), поэтому тест можно гонять сколько угодно раз.
+// Каждый запуск создаёт новых пользователей, поэтому тест можно гонять сколько угодно раз.
 const run = Date.now().toString(36);   // например 'mgk3x1a' — уникальная метка запуска
 const ANNA = `Анна ${run}`;
 const BORIS = `Борис ${run}`;
@@ -13,33 +13,52 @@ const PNG = Buffer.from(
     'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAAAFklEQVR4nGM4bppHEmIY1TCqYfhqAADMhmoQBmZmNwAAAABJRU5ErkJggg==',
     'base64');
 
-// Каждому человеку — свой «Telegram id». Вход без Telegram работает только в разработке:
-// фронтенд в режиме npm run dev и Worker с DEV_AUTH=1 (worker/.dev.vars). См. frontend/src/lib/telegram.ts
-const devAuth = (telegramId: number, name: string) => `dev ${telegramId}:${encodeURIComponent(name)}`;
-const ANNA_TG = Date.now() % 1_000_000_000;
-const BORIS_TG = ANNA_TG + 1;
+// Администратор из worker/.dev.vars (ADMIN_EMAILS=admin@example.com). Ему регистрироваться можно всегда
+const ADMIN = 'admin@example.com';
+const PASSWORD = 'password123';
+const emailOf = (login: string) => `${login}-${run}@e2e.test`; // в email только латиница
 
-// Администратор открывает человеку доступ командой боту /allow — как в Telegram.
-// Сообщение «от Telegram» подписано секретом webhook и администратором 1000 из worker/.dev.vars
-async function allow(browser: Browser, telegramId: number) {
-    const context = await browser.newContext();
-    const response = await context.request.post('/api/telegram/webhook', {
-        headers: { 'X-Telegram-Bot-Api-Secret-Token': 'local-webhook-secret' },
-        data: { message: { chat: { id: 1000 }, from: { id: 1000, first_name: 'Админ' }, text: `/allow ${telegramId}` } },
-    });
-    expect(response.ok()).toBe(true);
-    await context.close();
-}
-
-// Свой браузер (контекст) для каждого человека
-async function register(browser: Browser, name: string, telegramId: number): Promise<Page> {
-    await allow(browser, telegramId);
-    const page = await (await browser.newContext()).newPage();
-    await page.goto(`/?as=${telegramId}:${encodeURIComponent(name)}`); // «открыли из Telegram» впервые
-    await expect(page.getByRole('heading', { name: 'Добро пожаловать!' })).toBeVisible();
+// Заполнить форму регистрации. Что будет дальше — проверяет тот, кто вызвал
+async function fillRegister(page: Page, name: string, email: string) {
+    await page.goto('/register');
+    await page.getByLabel('Имя').fill(name);
+    await page.getByLabel('Email').fill(email);
+    await page.getByLabel('Пароль').fill(PASSWORD);
     await page.getByLabel(/обработку моих персональных данных/).check();
     await page.getByLabel(/принимаю Условия использования/).check();
-    await page.getByRole('button', { name: 'Начать' }).click();
+    await page.getByRole('button', { name: 'Создать аккаунт' }).click();
+}
+
+// Администратор входит. В первый запуск его ещё нет в базе — тогда он регистрируется
+async function adminLogin(browser: Browser): Promise<Page> {
+    const page = await (await browser.newContext()).newPage();
+    await fillRegister(page, 'Админ', ADMIN);
+    const calendar = page.getByRole('button', { name: 'Мой календарь' });
+    const taken = page.getByText('Этот email уже зарегистрирован');
+    await expect(calendar.or(taken)).toBeVisible();
+    if (await taken.isVisible()) {
+        await page.goto('/login');
+        await page.getByLabel('Email').fill(ADMIN);
+        await page.getByLabel('Пароль').fill(PASSWORD);
+        await page.getByRole('button', { name: 'Войти' }).click();
+        await expect(calendar).toBeVisible();
+    }
+    return page;
+}
+
+// Администратор на странице «Доступ» разрешает email регистрироваться
+async function allow(admin: Page, email: string) {
+    await admin.getByRole('link', { name: 'Доступ' }).click();
+    await admin.getByLabel('Разрешить email').fill(email);
+    await admin.getByRole('button', { name: 'Разрешить' }).click();
+    await expect(admin.getByRole('list', { name: 'Разрешённые email' }).getByText(email)).toBeVisible();
+    await admin.getByRole('link', { name: '← К календарю' }).click();
+}
+
+// Свой браузер (контекст) для каждого человека: свои cookie, своя сессия
+async function register(browser: Browser, name: string, login: string): Promise<Page> {
+    const page = await (await browser.newContext()).newPage();
+    await fillRegister(page, name, emailOf(login));
     await expect(page.getByRole('button', { name: 'Мой календарь' })).toBeVisible();
     return page;
 }
@@ -56,8 +75,20 @@ function day15(page: Page, state: string | RegExp) {
 }
 
 test('Анна открывает день Борису, и он видит картинку и комментарий', async ({ browser }) => {
-    const anna = await register(browser, ANNA, ANNA_TG);
-    const boris = await register(browser, BORIS, BORIS_TG);
+    await test.step('Без приглашения зарегистрироваться нельзя', async () => {
+        const page = await (await browser.newContext()).newPage();
+        await fillRegister(page, ANNA, emailOf('anna'));
+        await expect(page.getByText('Регистрация по приглашению. Попросите администратора добавить ваш email')).toBeVisible();
+        await page.context().close();
+    });
+
+    const admin = await adminLogin(browser);
+    await test.step('Администратор разрешает Анне и Борису регистрироваться', async () => {
+        await allow(admin, emailOf('anna'));
+        await allow(admin, emailOf('boris'));
+    });
+    const anna = await register(browser, ANNA, 'anna');
+    const boris = await register(browser, BORIS, 'boris');
 
     await test.step('Анна и Борис становятся друзьями', async () => {
         await openFriends(anna);
@@ -99,11 +130,10 @@ test('Анна открывает день Борису, и он видит ка
     });
 
     await test.step('Сервер не отдаёт Борису закрытое даже напрямую через API', async () => {
-        const annaId = (await (await anna.request.get('/api/me',
-            { headers: { Authorization: devAuth(ANNA_TG, ANNA) } })).json()).id;
+        // page.request берёт cookie этого браузера: запрос идёт от имени Анны или Бориса
+        const annaId = (await (await anna.request.get('/api/me')).json()).id;
         const month = new Date().toISOString().slice(0, 7); // '2026-10'
-        const response = await boris.request.get(`/api/calendars/${annaId}?month=${month}`,
-            { headers: { Authorization: devAuth(BORIS_TG, BORIS) } });
+        const response = await boris.request.get(`/api/calendars/${annaId}?month=${month}`);
         expect(response.ok()).toBe(true);
         const body = await response.text();
         expect(body).not.toContain(TITLE);

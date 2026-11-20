@@ -9,7 +9,6 @@ import type { App } from '../env';
 import { conflict, notFound } from '../errors';
 import { idParam, now } from '../lib/validate';
 import { areFriends } from '../lib/friendship';
-import { notify, telegramIdOf } from '../lib/notify';
 import { findMyWish } from './wishes';
 
 export const accessRoutes = new Hono<App>();
@@ -43,12 +42,12 @@ accessRoutes.post('/wishes/:wishId{[0-9]+}/access-requests', async c => {
     const wishId = idParam(c, 'wishId');
     const db = c.env.DB;
     const wish = await db.prepare(
-        `SELECT w.owner_id AS ownerId, w.wish_date AS date, u.telegram_id AS ownerTelegramId,
+        `SELECT w.owner_id AS ownerId,
                 EXISTS (SELECT 1 FROM wish_access a WHERE a.wish_id = w.id AND a.viewer_id = ?1) AS isOpen,
                 EXISTS (SELECT 1 FROM access_requests r WHERE r.wish_id = w.id AND r.from_user_id = ?1) AS isRequested
-         FROM wishes w JOIN users u ON u.id = w.owner_id WHERE w.id = ?2`)
+         FROM wishes w WHERE w.id = ?2`)
         .bind(me.id, wishId)
-        .first<{ ownerId: number; date: string; ownerTelegramId: number; isOpen: number; isRequested: number }>();
+        .first<{ ownerId: number; isOpen: number; isRequested: number }>();
     if (!wish) throw notFound(`Желание с id ${wishId} не найдено`);
     if (wish.ownerId === me.id) throw conflict('Это ваш собственный день');
     // Чужой человек (не друг) не должен даже узнать, что такое желание есть, поэтому 404
@@ -58,15 +57,9 @@ accessRoutes.post('/wishes/:wishId{[0-9]+}/access-requests', async c => {
 
     await db.prepare('INSERT INTO access_requests (wish_id, from_user_id, created_at) VALUES (?, ?, ?)')
         .bind(wishId, me.id, now()).run();
-    notify(c, wish.ownerTelegramId, `🔐 ${me.name} просит открыть ваш день ${formatDay(wish.date)}`);
     return c.body(null, 201);
 });
 
-// '2026-10-05' → '5 октября'
-const MONTHS = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
-function formatDay(date: string) {
-    return `${Number(date.slice(8))} ${MONTHS[Number(date.slice(5, 7)) - 1]}`;
-}
 
 accessRoutes.get('/access-requests/incoming', async c => {
     const { results } = await c.env.DB.prepare(
@@ -94,8 +87,6 @@ accessRoutes.post('/access-requests/:id{[0-9]+}/grant', async c => {
     const me = c.get('me');
     const request = await findRequestToMe(c.env.DB, me.id, idParam(c, 'id'));
     await grant(c.env.DB, me.id, request.wishId, request.fromId);
-    const fromTelegramId = await telegramIdOf(c.env.DB, request.fromId);
-    if (fromTelegramId !== null) notify(c, fromTelegramId, `🎁 ${me.name} открыл(а) вам свой день`);
     return c.body(null, 204);
 });
 

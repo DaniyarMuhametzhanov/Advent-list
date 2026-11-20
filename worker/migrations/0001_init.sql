@@ -1,15 +1,40 @@
 -- Вся база календаря для D1 (это SQLite). Те же таблицы, что в Java-версии (V1–V8),
--- только вход теперь через Telegram: вместо email и пароля храним telegram_id.
+-- плюс роли, сессии и список email, которым администратор разрешил регистрацию.
 -- В SQLite нет TIMESTAMPTZ и BOOLEAN: время храним текстом в формате ISO ('2026-10-30T12:00:00.000Z')
 
 CREATE TABLE users (
-    id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    telegram_id INTEGER NOT NULL UNIQUE, -- id человека в Telegram. Его присылает сам Telegram, подделать нельзя
-    name        TEXT    NOT NULL,        -- имя и фамилия из Telegram
-    name_lower  TEXT    NOT NULL,        -- то же имя маленькими буквами: для поиска (см. friends.ts)
-    username    TEXT,                    -- @ник в Telegram. Может не быть
-    created_at  TEXT    NOT NULL
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    name          TEXT    NOT NULL,
+    name_lower    TEXT    NOT NULL,        -- то же имя маленькими буквами: для поиска (см. friends.ts)
+    email         TEXT    NOT NULL UNIQUE, -- всегда маленькими буквами
+    password_hash TEXT    NOT NULL,        -- не сам пароль, а его хеш (см. auth/password.ts)
+    role          TEXT    NOT NULL DEFAULT 'USER' CHECK (role IN ('USER', 'ADMIN')), -- обычный или администратор
+    created_at    TEXT    NOT NULL
 );
+
+-- Кому администратор разрешил регистрироваться. Убрал email из списка — человек больше не может
+-- ни зарегистрироваться, ни пользоваться календарём (его желания при этом не удаляются)
+CREATE TABLE allowed_emails (
+    email    TEXT PRIMARY KEY,
+    added_at TEXT NOT NULL
+);
+
+-- Сессии: «этот браузер вошёл как этот человек». В cookie лежит случайный токен,
+-- а в базе только его хеш: если базу украдут, войти по ней не получится
+CREATE TABLE sessions (
+    token_hash TEXT    PRIMARY KEY,
+    user_id    INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    expires_at TEXT    NOT NULL
+);
+CREATE INDEX idx_sessions_user ON sessions (user_id);
+
+-- Неудачные попытки входа: защита от подбора пароля (как LoginRateLimiter с Redis в Java-версии)
+CREATE TABLE login_failures (
+    id        INTEGER PRIMARY KEY AUTOINCREMENT,
+    email     TEXT NOT NULL,
+    failed_at TEXT NOT NULL
+);
+CREATE INDEX idx_login_failures_email ON login_failures (email, failed_at);
 
 CREATE TABLE wishes (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,

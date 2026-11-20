@@ -1,5 +1,4 @@
 // Общая функция для всех запросов к нашему серверу.
-import { authHeader } from '../lib/telegram';
 
 // Ошибка, которая помнит код ответа (401, 404...), чтобы его можно было проверить
 export class HttpError extends Error {
@@ -18,22 +17,19 @@ export async function request<T>(url: string, init?: RequestInit): Promise<T> {
     const isForm = init?.body instanceof FormData;
     const headers: Record<string, string> = isForm ? {} : { 'Content-Type': 'application/json' };
 
-    // Кто я: подписанные Telegram данные (initData). Сервер проверяет подпись в каждом запросе.
-    // Cookie больше нет, поэтому и защита от CSRF (токен XSRF-TOKEN) не нужна:
-    // чужой сайт не может добавить этот заголовок к запросу
-    const auth = authHeader();
-    if (auth) headers['Authorization'] = auth;
+    // Cookie сессии браузер отправляет сам. Защита от CSRF теперь на сервере: он проверяет заголовок Origin
+    // (с какого сайта запрос), а его браузер ставит сам, и подделать его страница не может
 
     const response = await fetch(url, { ...init, headers });
 
     if (!response.ok) {
-        // Сервер отвечает в формате ProblemDetail: { detail, errors? }
+        // Сервер отвечает в формате ProblemDetail (как GlobalExceptionHandler в Java): { detail, errors? }
         const problem = await response.json().catch(() => null);
         const fieldError = problem?.errors && Object.values(problem.errors)[0];
         throw new HttpError(fieldError ?? problem?.detail ?? `Ошибка сервера: ${response.status}`, response.status);
     }
 
-    // Тела может не быть: 204 No Content (удаление)
+    // Тела может не быть: 204 No Content (удаление) или пустой ответ 200 (выход)
     const text = await response.text();
     return (text ? JSON.parse(text) : undefined) as T;
 }

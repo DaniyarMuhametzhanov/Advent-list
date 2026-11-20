@@ -6,14 +6,14 @@
 import { Hono } from 'hono';
 import type { App } from './env';
 import { toProblem } from './errors';
-import { requireUser, telegramAuth } from './auth/middleware';
-import { authRoutes } from './routes/auth';
+import { requireUser, sameOrigin } from './auth/middleware';
+import { authRoutes, meRoutes } from './routes/auth';
 import { wishRoutes } from './routes/wishes';
-import { imagePublicRoutes, imageRoutes } from './routes/images';
+import { imageRoutes } from './routes/images';
 import { friendRoutes } from './routes/friends';
 import { accessRoutes } from './routes/access';
 import { holidayRoutes } from './routes/holidays';
-import { botRoutes } from './routes/bot';
+import { adminRoutes } from './routes/admin';
 
 const app = new Hono<App>().basePath('/api');
 
@@ -26,23 +26,22 @@ app.use('*', async (c, next) => {
     c.header('Referrer-Policy', 'no-referrer');
 });
 
-// 1. Без входа: проверка «сервер жив», бот и картинки по подписанному адресу
-app.get('/health', c => c.json({ status: 'ok' }));
-app.route('/telegram', botRoutes);
-app.route('/', imagePublicRoutes);
+// 1. Защита от подделки запросов с чужих сайтов (CSRF) — для всех адресов
+app.use('*', sameOrigin);
 
-// 2. Нужен Telegram, но аккаунта ещё может не быть: «кто я» и регистрация
-app.use('/me', telegramAuth);
-app.use('/auth/*', telegramAuth);
+// 2. Без входа: проверка «сервер жив», регистрация, вход, выход
+app.get('/health', c => c.json({ status: 'ok' }));
 app.route('/', authRoutes);
 
-// 3. Всё остальное — только для зарегистрированных
-app.use('*', telegramAuth, requireUser);
+// 3. Всё остальное — только для вошедших
+app.use('*', requireUser);
+app.route('/', meRoutes);
 app.route('/', wishRoutes);
 app.route('/', imageRoutes);
 app.route('/', friendRoutes);
 app.route('/', accessRoutes);
 app.route('/', holidayRoutes);
+app.route('/', adminRoutes);
 
 app.notFound(c => c.json({ status: 404, detail: 'Нет такого адреса' }, 404));
 app.onError(toProblem);

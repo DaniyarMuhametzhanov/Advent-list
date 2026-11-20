@@ -1,3 +1,4 @@
+import { Link } from 'react-router';
 import type { UserId } from '../types';
 import { USERS } from '../data/fakeData';
 import { Avatar } from './Avatar';
@@ -7,15 +8,19 @@ type Props = {
     badge: number;
     friendsOpen: boolean;
     onFriendsClick: () => void;
+    onLogout: () => void;
+    isAdmin: boolean; // администратору показываем ссылку на страницу «Доступ»
 };
 
-export function Header({ me, badge, friendsOpen, onFriendsClick }: Props) {
+export function Header({ me, badge, friendsOpen, onFriendsClick, onLogout, isAdmin }: Props) {
     return (
         <header className="top">
             <div className="top-in">
                 <div className="logo"><i>🎁</i><span>Адвент-календарь</span></div>
 
                 <span className="me"><Avatar user={USERS[me]} />{USERS[me].name}</span>
+                {isAdmin && <Link className="btn sm ghost" to="/admin">Доступ</Link>}
+                <button className="btn sm ghost" onClick={onLogout}>Выйти</button>
 
                 <button className="btn-friends" onClick={onFriendsClick} aria-expanded={friendsOpen} aria-controls="side">
                     Друзья{badge > 0 && <span className="badge">{badge}</span>}

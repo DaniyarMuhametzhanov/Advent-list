@@ -10,7 +10,7 @@
 wishlist-calendar/
 ├── worker/     # сервер сейчас: TypeScript на Cloudflare Workers + D1 + R2 (этап 15)
 ├── backend/    # прошлая версия сервера: Java 21 + Spring Boot 3 (этапы 1–14)
-├── frontend/   # интерфейс: React + Vite + TypeScript, открывается как Telegram Mini App
+├── frontend/   # интерфейс: React + Vite + TypeScript
 ├── docs/       # заметки по этапам
 ├── .gitignore
 └── README.md
@@ -31,5 +31,5 @@ Maven отдельно ставить не нужно: в проекте буд�
 
 ## Запуск
 
-Календарь работает внутри Telegram (Mini App), бэкенд — на бесплатном Cloudflare.
+Сайт с входом по email и паролю, бэкенд — на бесплатном Cloudflare. Регистрация только по приглашению администратора.
 Как запустить у себя и выложить в интернет: [docs/stage-15.md](docs/stage-15.md).
