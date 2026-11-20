@@ -8,7 +8,7 @@
 
 ```
 wishlist-calendar/
-├── worker/     # сервер сейчас: TypeScript на Cloudflare Workers + D1 + R2 (этап 15)
+├── worker/     # сервер сейчас: TypeScript на Cloudflare Workers + D1 (этап 15)
 ├── backend/    # прошлая версия сервера: Java 21 + Spring Boot 3 (этапы 1–14)
 ├── frontend/   # интерфейс: React + Vite + TypeScript
 ├── docs/       # заметки по этапам

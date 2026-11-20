@@ -268,14 +268,13 @@ describe('Картинки', () => {
         await call(anna.auth, 'DELETE', `/api/wishes/${wish.id}/access/${boris.id}`);
         expect((await call(boris.auth, 'GET', borisUrl)).status).toBe(404);
 
-        // Новая картинка — новый адрес. Удалили желание — файлы из R2 тоже удалены
+        // Новая картинка — новый адрес. Удалили желание — файлы из базы тоже удалены
         const replaced = await call(anna.auth, 'POST', `/api/wishes/${wish.id}/image`, form(JPEG));
         expect(replaced.body.imageUrl).not.toBe(annaUrl);
         await call(anna.auth, 'DELETE', `/api/wishes/${wish.id}`);
         expect((await call(anna.auth, 'GET', replaced.body.imageUrl)).status).toBe(404);
-        const bucket = await mf.getR2Bucket('IMAGES');
-        const key = new URL('http://x' + replaced.body.imageUrl).searchParams.get('v');
-        expect(await bucket.head(`${key}/full.jpg`)).toBeNull();
+        const db = await mf.getD1Database('DB');
+        expect(await db.prepare('SELECT COUNT(*) AS n FROM images').first('n')).toBe(0);
     });
 });
 
